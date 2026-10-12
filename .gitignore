@@ -1,0 +1,24 @@
+# Build
+target/
+!.mvn/wrapper/maven-wrapper.properties
+
+# Local configuration (see .env.example)
+.env
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/settings.local.json
+CLAUDE.local.md
+# Points at this machine's IntelliJ MCP port
+.mcp.json

@@ -1,0 +1,12 @@
+# Local development only. Activated by ./mvnw spring-boot:run (see pom.xml), never by a packaged jar.
+# Password defaults match docker-compose.yml and are not secrets.
+spring:
+  config:
+    # Picks up overrides from the same .env file docker compose reads.
+    import: optional:file:.env[.properties]
+  datasource:
+    password: ${APP_DB_PASSWORD:partnerguard-app-local}
+  flyway:
+    password: ${POSTGRES_PASSWORD:partnerguard-local}
+    # Seed data (specs/fixtures.md) is loaded only in this profile (ADR-0015).
+    locations: classpath:db/migration,classpath:db/seed
