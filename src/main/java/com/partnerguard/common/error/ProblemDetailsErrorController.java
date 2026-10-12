@@ -1,5 +1,6 @@
 package com.partnerguard.common.error;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.webmvc.error.ErrorController;
@@ -18,6 +19,7 @@ import java.net.URI;
  * whatever the Accept header says, so neither an HTML error page nor Boot's default error
  * attributes ever reach a client (ADR-0008, spec ERR-08).
  */
+@Hidden
 @RestController
 public class ProblemDetailsErrorController implements ErrorController {
 

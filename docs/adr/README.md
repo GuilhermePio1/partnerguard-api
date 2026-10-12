@@ -20,7 +20,8 @@ creates one and updates this index.
 | [0012](0012-audit-log-in-same-transaction.md) | Write the audit log synchronously in the same transaction | Accepted |
 | [0013](0013-plain-text-input-and-xss.md) | Free-text fields are plain text; SQL-like input is data | Accepted |
 | [0014](0014-uuid-identifiers.md) | Use random UUIDs as public identifiers | Accepted |
-| [0015](0015-flyway-and-local-seed-data.md) | Flyway for schema; seed data only in the local profile | Accepted |
+| [0015](0015-flyway-and-local-seed-data.md) | Flyway for schema; seed data only in the local profile | Accepted (partly superseded by 0019) |
 | [0016](0016-security-test-matrix.md) | The security test matrix is the core test suite | Accepted |
 | [0017](0017-add-get-claim-by-id.md) | Add `GET /api/v1/claims/{id}`; defer admin CRUD | Accepted |
 | [0018](0018-verified-tls-for-database-connections.md) | Require verified TLS (`sslmode=verify-full`) for database connections outside local development | Accepted |
+| [0019](0019-repeatable-seed-and-least-privilege-grants.md) | Seed data as a repeatable migration; least-privilege grants per table | Accepted |

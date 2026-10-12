@@ -21,6 +21,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  jackson:
+    deserialization:
+      # Unknown JSON properties are a 400, so nothing like partnerId can be smuggled in (ADR-0003).
+      fail-on-unknown-properties: true
   web:
     error:
       # Spring Boot 4 name; the old server.error.* keys are no longer bound.
@@ -31,6 +35,15 @@ spring:
       # No HTML error page: errors must be Problem Details (ADR-0008).
       whitelabel:
         enabled: false
+
+springdoc:
+  # API docs and Swagger UI are enabled only in the local profile (ADR-0005, DOC-02).
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+  # Document exactly what the contract declares; no codes inferred from the controller advice.
+  override-with-generic-response: false
 
 management:
   endpoints:

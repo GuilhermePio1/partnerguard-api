@@ -6,9 +6,13 @@ Bucket4j. The point of the project is **security that is specified, decided and
 tested**. Treat every security rule as a requirement with a test, not a
 nice-to-have.
 
-Status: milestone 1 done (app skeleton, Compose with PostgreSQL, Flyway, code
-generated from the contract). Next: milestone 2, domain and endpoints without
-security (`README.md` §13).
+Status: milestone 2 done (all contract endpoints, seed, Problem Details, DOC-01
+green). Next: milestone 3, Keycloak and JWT validation (`README.md` §13).
+
+**Temporary seam:** `common.caller.OpenAccessCallerContext` gives every caller
+the unrestricted scope and no partner id, because there is no authentication
+yet. Milestones 3–4 replace it with a JWT-based `CallerContext` and delete it.
+Controllers must keep getting scope and partner id **only** from `CallerContext`.
 
 ## Where things live
 

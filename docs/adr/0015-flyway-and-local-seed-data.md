@@ -1,6 +1,6 @@
 # ADR-0015: Flyway for schema; seed data only in the local profile
 
-- **Status:** Accepted
+- **Status:** Accepted; seed naming and grants superseded by [ADR-0019](0019-repeatable-seed-and-least-privilege-grants.md)
 - **Date:** 2026-10-12
 - **Deciders:** Project owner
 - **Related:** [specs/fixtures.md](../../specs/fixtures.md), `.claude/skills/flyway-migration`

@@ -20,6 +20,8 @@
     <properties>
         <java.version>21</java.version>
         <openapi-generator.version>7.25.0</openapi-generator.version>
+        <springdoc.version>3.1.1</springdoc.version>
+        <archunit.version>1.5.1</archunit.version>
 
         <!--
           Security overrides of versions managed by Spring Boot. Remove each one as soon as
@@ -70,6 +72,11 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
@@ -98,6 +105,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -131,6 +144,8 @@
                             <generatorName>spring</generatorName>
                             <apiPackage>com.partnerguard.api</apiPackage>
                             <modelPackage>com.partnerguard.api.model</modelPackage>
+                            <!-- PartnerDto, ClaimStatusDto...: keeps contract types apart from domain entities. -->
+                            <modelNameSuffix>Dto</modelNameSuffix>
                             <generateSupportingFiles>false</generateSupportingFiles>
                             <generateApiTests>false</generateApiTests>
                             <generateModelTests>false</generateModelTests>
@@ -142,11 +157,14 @@
                                 <useJackson3>true</useJackson3>
                                 <useBeanValidation>true</useBeanValidation>
                                 <performBeanValidation>false</performBeanValidation>
+                                <!-- No class-level @Validated: Spring MVC's built-in method validation only. -->
+                                <useSpringBuiltInValidation>true</useSpringBuiltInValidation>
                                 <useTags>true</useTags>
                                 <skipDefaultInterface>true</skipDefaultInterface>
                                 <openApiNullable>false</openApiNullable>
-                                <documentationProvider>none</documentationProvider>
-                                <annotationLibrary>none</annotationLibrary>
+                                <!-- Swagger annotations let springdoc reproduce every documented status (DOC-01). -->
+                                <documentationProvider>springdoc</documentationProvider>
+                                <annotationLibrary>swagger2</annotationLibrary>
                                 <hideGenerationTimestamp>true</hideGenerationTimestamp>
                                 <useResponseEntity>true</useResponseEntity>
                                 <dateLibrary>java8</dateLibrary>

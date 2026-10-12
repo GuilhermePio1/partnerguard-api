@@ -33,7 +33,14 @@ class ApplicationStartupTests extends PostgresIntegrationTest {
     void flywayAppliesMigrationsAsOwner() {
         MigrationInfo[] applied = flyway.info().applied();
 
-        assertThat(applied).extracting(info -> info.getVersion().getVersion()).contains("1");
+        assertThat(applied)
+                .filteredOn(info -> info.getVersion() != null)
+                .extracting(info -> info.getVersion().getVersion())
+                .contains("1", "2", "3", "4", "5");
+        // The seed is a repeatable migration (no version), applied after the schema (ADR-0019).
+        assertThat(applied).filteredOn(info -> info.getVersion() == null)
+                .extracting(MigrationInfo::getDescription)
+                .containsExactly("seed fixtures");
         assertThat(applied).allSatisfy(info -> assertThat(info.getInstalledBy()).isEqualTo(POSTGRES.getUsername()));
     }
 
@@ -53,11 +60,30 @@ class ApplicationStartupTests extends PostgresIntegrationTest {
     }
 
     @Test
+    @DisplayName("ADR-0015 the application role can't delete rows or write read-only tables")
+    void applicationRoleHasLeastPrivilege() {
+        assertThatThrownBy(() -> jdbcTemplate.update("delete from claim"))
+                .rootCause().hasMessageContaining("permission denied for table claim");
+        assertThatThrownBy(() -> jdbcTemplate.update("update policy set status = 'EXPIRED'"))
+                .rootCause().hasMessageContaining("permission denied for table policy");
+        assertThatThrownBy(() -> jdbcTemplate.update("update partner set status = 'SUSPENDED'"))
+                .rootCause().hasMessageContaining("permission denied for table partner");
+    }
+
+    @Test
     @DisplayName("AUTHZ-14 health is UP and shows no details")
     void healthIsUpWithoutDetails() {
         assertThat(mvc.get().uri("/actuator/health"))
                 .hasStatusOk()
                 .bodyJson().isStrictlyEqualTo("{\"status\":\"UP\"}");
+    }
+
+    @Test
+    @DisplayName("DOC-02 outside the local profile, API docs and Swagger UI are not served")
+    void apiDocsHiddenOutsideLocalProfile() {
+        assertThat(mvc.get().uri("/v3/api-docs")).hasStatus(404);
+        assertThat(mvc.get().uri("/swagger-ui/index.html")).hasStatus(404);
+        assertThat(mvc.get().uri("/swagger-ui.html")).hasStatus(404);
     }
 
     @Test

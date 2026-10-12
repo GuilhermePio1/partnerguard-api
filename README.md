@@ -7,10 +7,23 @@ authentication, role-based and ownership-based authorization, rate limiting,
 and defenses against the most common OWASP risks. Every security decision is
 written down, specified and tested.
 
-> **Status:** milestone 1 (project setup) is done. The Spring Boot app,
-> PostgreSQL and Flyway run with Docker Compose, and the API interfaces are
-> generated from the contract. There are no domain endpoints or security yet
-> (milestones 2–4), and Keycloak arrives in milestone 3. The original brief is
+> **Status:** milestone 2 (domain and endpoints) is done. Every endpoint in
+> the contract works against PostgreSQL with the seed fixtures, errors are
+> Problem Details, and the runtime API docs match the contract.
+>
+> **Until milestones 3–6 land, these accepted decisions are not in force yet,
+> so run it locally only:**
+> - No authentication (ADR-0002): the API is open, and every caller gets the
+>   internal view of all partners' data. `GET /partners/me` fails closed with
+>   `403` because no caller has a partner identity.
+> - No role or field checks (ADR-0005, ADR-0009): `PATCH /claims/{id}` applies
+>   any field, as ADMIN would. Ownership scoping exists in the services and is
+>   tested there, but nothing selects the partner scope yet.
+> - No rate limiting (ADR-0006), no audit log (ADR-0012), no security headers.
+> - `scripts/smoke-test.*` and `scripts/rate-limit-check.*` expect those rules
+>   and fail by design until milestone 5.
+>
+> The original brief is
 > [`partnerguard-api.md`](partnerguard-api.md). This README supersedes it where
 > they differ, and each difference is marked and linked to an ADR.
 
@@ -374,7 +387,7 @@ On every push and pull request, GitHub Actions runs:
 | # | Milestone | Done when |
 |---|---|---|
 | 1 ✅ | Project setup | Spring Boot app, PostgreSQL and Flyway running in Docker Compose; openapi-generator + Spring Boot 4 compatibility confirmed (ADR-0007) |
-| 2 | Domain and CRUD | Entities, repositories and endpoints working without security; contract drift test green |
+| 2 ✅ | Domain and CRUD | Entities, repositories and endpoints working without security; contract drift test green |
 | 3 | Authentication | Keycloak realm configured; API accepts only valid JWTs (`AUTHN-*`) |
 | 4 | Authorization | Role, ownership and field checks with full test coverage (`AUTHZ-*`, `CLM-*`) |
 | 5 | Rate limiting | Two-layer Bucket4j limits, with tests (`RL-*`) |

@@ -1,7 +1,7 @@
 package com.partnerguard.api;
 
-import com.partnerguard.api.model.ClaimUpdateRequest;
-import com.partnerguard.api.model.PartnerCreateRequest;
+import com.partnerguard.api.model.ClaimUpdateRequestDto;
+import com.partnerguard.api.model.PartnerCreateRequestDto;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -68,7 +68,7 @@ class GeneratedContractTests {
     @Test
     @DisplayName("ADR-0013 generated DTOs reject markup in free text")
     void freeTextRejectsMarkup() {
-        ClaimUpdateRequest request = new ClaimUpdateRequest().description("<script>alert(1)</script>");
+        ClaimUpdateRequestDto request = new ClaimUpdateRequestDto().description("<script>alert(1)</script>");
 
         assertThat(violatedFields(validator.validate(request))).containsExactly("description");
     }
@@ -76,19 +76,19 @@ class GeneratedContractTests {
     @Test
     @DisplayName("ADR-0007 generated DTOs carry the contract's numeric limits")
     void amountLimitsComeFromTheContract() {
-        assertThat(violatedFields(validator.validate(new ClaimUpdateRequest().amount(new BigDecimal("0.00")))))
+        assertThat(violatedFields(validator.validate(new ClaimUpdateRequestDto().amount(new BigDecimal("0.00")))))
                 .containsExactly("amount");
-        assertThat(validator.validate(new ClaimUpdateRequest().amount(new BigDecimal("1250.50")))).isEmpty();
+        assertThat(validator.validate(new ClaimUpdateRequestDto().amount(new BigDecimal("1250.50")))).isEmpty();
     }
 
     @Test
     @DisplayName("ADR-0007 required fields and the CNPJ format come from the contract")
     void requiredFieldsAndCnpjFormat() {
-        PartnerCreateRequest missingTaxId = new PartnerCreateRequest();
+        PartnerCreateRequestDto missingTaxId = new PartnerCreateRequestDto();
         missingTaxId.setLegalName("Oficina Gama Ltda");
         assertThat(violatedFields(validator.validate(missingTaxId))).containsExactly("taxId");
 
-        PartnerCreateRequest valid = new PartnerCreateRequest();
+        PartnerCreateRequestDto valid = new PartnerCreateRequestDto();
         valid.setLegalName("Oficina Gama Ltda");
         valid.setTaxId("12.ABC.345/01DE-35");
         assertThat(validator.validate(valid)).isEmpty();

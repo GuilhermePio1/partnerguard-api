@@ -38,5 +38,7 @@ public abstract class PostgresIntegrationTest {
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
         registry.add("spring.flyway.placeholders.appDbUser", () -> APP_DB_USER);
+        // Fixtures from specs/fixtures.md. Tests that change them must roll back (@Transactional).
+        registry.add("spring.flyway.locations", () -> "classpath:db/migration,classpath:db/seed");
     }
 }

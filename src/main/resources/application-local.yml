@@ -10,3 +10,9 @@ spring:
     password: ${POSTGRES_PASSWORD:partnerguard-local}
     # Seed data (specs/fixtures.md) is loaded only in this profile (ADR-0015).
     locations: classpath:db/migration,classpath:db/seed
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

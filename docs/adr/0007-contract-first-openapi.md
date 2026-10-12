@@ -46,9 +46,16 @@ reviewers can't check intent against implementation.
   primitive types for the same reason; the plain-text pattern is inlined.
 - Likewise, `enum` on a **query parameter** (the `sort` allow-lists) is generated
   as a plain `String` with no constraint. The allow-list check (`API-02`) needs code.
-- Until springdoc arrives, the generator runs with `documentationProvider=none`
-  and `annotationLibrary=none` (no swagger-annotations dependency). Revisit both
-  when Swagger UI is wired.
+- Since milestone 2 the generator runs with `documentationProvider=springdoc`
+  and `annotationLibrary=swagger2`, so springdoc 3.x reproduces every documented
+  status code; `useSpringBuiltInValidation=true` (no class-level `@Validated`, so
+  constraint failures arrive as `HandlerMethodValidationException`); and
+  `modelNameSuffix=Dto` (`ClaimDto`, `ClaimStatusDto`...), which keeps contract
+  types apart from domain entities of the same name.
+- Because the generated annotations come from the contract itself, `DOC-01`
+  mainly catches drift on the code side: an endpoint added outside the generated
+  interfaces, or an interface no controller implements. A mutation check (a
+  rogue `GET /api/v1/rogue`) confirmed it fails in that case.
 - **Verified in milestone 1 (2026-10-12):** openapi-generator **7.25.0** with
   `useSpringBoot4=true` and `useJackson3=true` generates code that compiles against
   **Spring Boot 4.1.1** (Jakarta EE, Jackson 3; model annotations stay in

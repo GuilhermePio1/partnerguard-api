@@ -50,9 +50,11 @@ Integration test (Testcontainers PostgreSQL + seed):
 4. Assert the bodies of 2 and 3 are **identical except `instance`**.
 5. Lists: no item has `partnerId ≠ A`; a `?partnerId=<B>` query parameter
    has no effect.
-6. A service-level test calls the service directly with Partner A's
-   `CurrentUser` and B's id and expects `ResourceNotFoundException`. This
-   proves the rule doesn't depend on the controller.
+6. A service-level test calls the service directly with
+   `OwnershipScope.partner(PARTNER_A)` and B's id and expects
+   `ResourceNotFoundException`. This proves the rule doesn't depend on the
+   controller. See `ContractServiceTests` / `ClaimServiceTests`; ids come from
+   `support.Fixtures`.
 7. An `ownership_denied` log event is emitted (use `OutputCaptureExtension`).
 
 ## 3. Field-level permissions (writes)

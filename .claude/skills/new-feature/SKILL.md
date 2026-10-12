@@ -58,13 +58,22 @@ Package by feature (`com.partnerguard.<feature>`, ADR-0011):
 
 | Piece | Rules |
 |---|---|
-| Controller | Implements the generated `<Tag>Api` interface. `@PreAuthorize("hasAnyRole('ADMIN','ANALYST')")` on **each implementation method**, matching `x-required-roles`. No business logic, no repository access. Takes `CurrentUser` from the security context and passes it down |
-| Service | `@Transactional`. Receives `CurrentUser`. Enforces ownership with `OwnershipScope` / `findByIdAndPartnerId`, throwing `ResourceNotFoundException` for both "missing" and "not yours". Field-level permission checks before the lookup. Calls `AuditService.record(...)` inside the same transaction for writes |
+| Controller | Implements the generated `<Tag>Api` interface (DTOs are `*Dto`). `@PreAuthorize("hasAnyRole('ADMIN','ANALYST')")` on **each implementation method**, matching `x-required-roles` (from milestone 4). No business logic, no repository access. Gets the caller's `OwnershipScope` and partner id **only** from `common.caller.CallerContext` and passes the scope down. Validates contract rules the generator can't (`minProperties`, `multipleOf`) and sorts via `common.web.SortOptions` |
+| Service | `@Transactional`. Receives an `OwnershipScope`. Enforces ownership in the query: `switch` on the scope, `findByIdAndPartnerId` for `PartnerOnly`, throwing `ResourceNotFoundException` for both "missing" and "not yours". Field-level permission checks before the lookup (milestone 4). Calls `AuditService.record(...)` inside the same transaction for writes (milestone 6) |
 | Repository | Spring Data derived queries or `@Query` JPQL with named parameters. **No string concatenation or `String.format` in queries.** Sort only from the contract's allow-list |
 | Entity | UUID id (`UUID.randomUUID()`), package-private where possible, `toString()` excludes sensitive fields |
 | Mapper | Entity → generated DTO. Apply masking (`common/masking`) here, e.g. `taxId` |
 
 If the change needs a table or column, use the `flyway-migration` skill.
+
+Errors: throw `ProblemException` (catalog type) or `ResourceNotFoundException`;
+`ApiExceptionHandler` renders them. Never put request data in an exception
+message.
+
+> **Until milestone 3–4:** `CallerContext` is implemented by
+> `OpenAccessCallerContext` (unrestricted scope, no partner id). Never widen it
+> or read identity anywhere else. Milestones 3–4 replace it with a JWT-backed
+> implementation.
 
 ## 5. Verify
 
