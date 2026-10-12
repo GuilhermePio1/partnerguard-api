@@ -1,6 +1,7 @@
 package com.partnerguard.common.error;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
@@ -53,8 +54,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     /** Every exception Spring MVC itself handles (400, 404, 405, 415...) ends up here. */
     @Override
-    protected ResponseEntity<Object> handleExceptionInternal(
-            Exception ex, Object body, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+    protected @Nullable ResponseEntity<Object> handleExceptionInternal(
+            Exception ex, @Nullable Object body, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         ProblemDetail problem = ProblemType.forStatus(status)
                 .map(ProblemType::toProblemDetail)
                 .orElseGet(() -> ProblemDetail.forStatus(status));
@@ -72,7 +73,9 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return switch (ex) {
             case MethodArgumentNotValidException e -> fieldViolations(e.getBindingResult());
             case HandlerMethodValidationException e -> methodViolations(e);
-            case TypeMismatchException e -> List.of(new FieldViolation(e.getPropertyName(), "has an invalid value"));
+            case TypeMismatchException e -> e.getPropertyName() == null
+                    ? List.of()
+                    : List.of(new FieldViolation(e.getPropertyName(), "has an invalid value"));
             case HttpMessageNotReadableException e -> bodyViolations(e);
             default -> List.of();
         };
@@ -85,7 +88,9 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 violations.addAll(fieldViolations(errors));
             } else {
                 String parameter = result.getMethodParameter().getParameterName();
-                result.getResolvableErrors().forEach(error -> violations.add(new FieldViolation(parameter, messageOf(error))));
+                if (parameter != null) {
+                    result.getResolvableErrors().forEach(error -> violations.add(new FieldViolation(parameter, messageOf(error))));
+                }
             }
         });
         return violations;
@@ -125,7 +130,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         }
     }
 
-    private static URI pathOf(WebRequest request) {
+    private static @Nullable URI pathOf(WebRequest request) {
         if (request instanceof NativeWebRequest nativeRequest
                 && nativeRequest.getNativeRequest() instanceof HttpServletRequest servletRequest) {
             try {

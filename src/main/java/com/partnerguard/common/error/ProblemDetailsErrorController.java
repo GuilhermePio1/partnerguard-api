@@ -3,6 +3,7 @@ package com.partnerguard.common.error;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.webmvc.error.ErrorController;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -38,7 +39,7 @@ public class ProblemDetailsErrorController implements ErrorController {
         return problem(problem, (String) request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI));
     }
 
-    private static ResponseEntity<ProblemDetail> problem(ProblemDetail problem, String path) {
+    private static ResponseEntity<ProblemDetail> problem(ProblemDetail problem, @Nullable String path) {
         problem.setInstance(toUri(path));
         return ResponseEntity.status(problem.getStatus())
                 // A preset content type makes Spring MVC skip Accept negotiation.
@@ -53,7 +54,7 @@ public class ProblemDetailsErrorController implements ErrorController {
         return ProblemType.INTERNAL_ERROR.status();
     }
 
-    private static URI toUri(String path) {
+    private static @Nullable URI toUri(@Nullable String path) {
         if (path == null) {
             return null;
         }
