@@ -1,5 +1,7 @@
 # PartnerGuard API
 
+[![CI](https://github.com/GuilhermePio1/partnerguard-api/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/GuilhermePio1/partnerguard-api/actions/workflows/ci.yml)
+
 A secure REST API for managing insurance policies and partner repair shops, built with Java 21 and Spring Boot 4.
 
 The project shows how to protect a business API end to end: OAuth2/OIDC
@@ -289,7 +291,7 @@ partnerguard-api/
 ├── docker-compose.yml
 ├── .env.example               # Local overrides template (copy to .env)
 ├── pom.xml, mvnw, mvnw.cmd
-└── .github/workflows/ci.yml   # (milestone 7)
+└── .github/workflows/ci.yml   # Build and tests (security scans in milestone 7)
 ```
 
 The code is organized by feature, not by layer
@@ -308,7 +310,7 @@ taken by a local PostgreSQL, copy `.env.example` to `.env` and set
 `POSTGRES_PORT=5433`.
 
 ```bash
-git clone https://github.com/<your-user>/partnerguard-api.git
+git clone https://github.com/GuilhermePio1/partnerguard-api.git
 cd partnerguard-api
 scripts/env-up.sh            # or: docker compose up -d
 ./mvnw spring-boot:run       # local profile (reads .env)
@@ -374,13 +376,21 @@ starts with its criterion ID (e.g. `CLM-12`).
 
 ## 12. CI pipeline
 
-On every push and pull request, GitHub Actions runs:
+On every push to `main` and every pull request, GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs:
 
-1. Build and unit tests
-2. Integration tests with Testcontainers
-3. Contract lint (`redocly lint contracts/openapi.yaml`)
-4. OWASP Dependency-Check (fails on CVSS ≥ 7) and secret scanning
-5. Test coverage report (JaCoCo)
+| # | Step | Status |
+|---|---|---|
+| 1 | Build: code generated from the contract, compilation | ✅ running |
+| 2 | Unit, integration (Testcontainers PostgreSQL) and architecture tests (`./mvnw verify`) | ✅ running |
+| 3 | Contract lint (`redocly lint contracts/openapi.yaml`) | Milestone 7 |
+| 4 | OWASP Dependency-Check (fails on CVSS ≥ 7) and secret scanning | Milestone 7 |
+| 5 | Test coverage report (JaCoCo) | Milestone 7 |
+
+The workflow is hardened like the API: the token is read-only
+(`permissions: contents: read`), checkout doesn't persist credentials, and
+every action is pinned to a full commit SHA, so a moved tag can't change what
+runs. Surefire reports are uploaded when a run fails.
 
 ## 13. Milestones
 
