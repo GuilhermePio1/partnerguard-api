@@ -42,6 +42,11 @@
           CVE-2026-91776, CVE-2026-91777 (fixed in 3.1.7). Patch release of the line Boot 4.1.1 manages (3.1.5).
         -->
         <jackson-bom.version>3.1.7</jackson-bom.version>
+        <!--
+          Jackson 2 (used by springdoc's swagger-core): same five CVEs, fixed in 2.21.6 / 2.21.7.
+          Patch release of the line Boot 4.1.1 manages (2.21.5).
+        -->
+        <jackson-2-bom.version>2.21.7</jackson-2-bom.version>
         <!-- pgjdbc CVE-2026-107314 and CVE-2026-107315, fixed in 42.7.14 (security-only release). Boot 4.1.1 manages 42.7.13. -->
         <postgresql.version>42.7.14</postgresql.version>
     </properties>
