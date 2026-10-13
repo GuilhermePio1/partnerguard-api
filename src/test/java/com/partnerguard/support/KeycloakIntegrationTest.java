@@ -3,11 +3,8 @@ package com.partnerguard.support;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
@@ -42,7 +39,7 @@ import java.util.stream.Collectors;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(KeycloakIntegrationTest.ClockConfig.class)
+@Import(TestClockConfig.class)
 public abstract class KeycloakIntegrationTest extends PostgresIntegrationTest {
 
     /** Same image as docker-compose.yml. Keep the two in sync. */
@@ -177,17 +174,6 @@ public abstract class KeycloakIntegrationTest extends PostgresIntegrationTest {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
-        }
-    }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class ClockConfig {
-
-        /** Replaces the application's clock, so JWT timestamp checks follow the test. */
-        @Bean
-        @Primary
-        MutableClock testClock() {
-            return new MutableClock();
         }
     }
 }

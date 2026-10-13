@@ -12,7 +12,7 @@ import java.util.Map;
 
 /**
  * Writes a catalog problem straight to the servlet response, for errors raised in filters
- * before Spring MVC runs (authentication entry point, later the rate-limit filters).
+ * before Spring MVC runs (authentication entry point, rate-limit filters).
  * Produces the same fields as the MVC handlers (ADR-0008).
  */
 @Component

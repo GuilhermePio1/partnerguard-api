@@ -3,7 +3,7 @@ package com.partnerguard.common.security;
 import org.jspecify.annotations.Nullable;
 
 /** Client-influenced text going into a log line. */
-final class LogValues {
+public final class LogValues {
 
     private static final int MAX_LENGTH = 200;
 
@@ -11,7 +11,7 @@ final class LogValues {
     }
 
     /** No control characters or quotes (log forging) and a bounded length. */
-    static String loggable(@Nullable String value) {
+    public static String loggable(@Nullable String value) {
         if (value == null) {
             return "";
         }

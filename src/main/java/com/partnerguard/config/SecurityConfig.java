@@ -1,5 +1,10 @@
 package com.partnerguard.config;
 
+import com.partnerguard.common.ratelimit.PreAuthRateLimitFilter;
+import com.partnerguard.common.ratelimit.RateLimitBuckets;
+import com.partnerguard.common.ratelimit.RateLimitProperties;
+import com.partnerguard.common.ratelimit.RateLimitRejections;
+import com.partnerguard.common.ratelimit.UserRateLimitFilter;
 import com.partnerguard.common.security.ApiCallerAuthorizationManager;
 import com.partnerguard.common.security.DenyByDefault;
 import com.partnerguard.common.security.KeycloakRealmRoleConverter;
@@ -7,6 +12,7 @@ import com.partnerguard.common.security.ProblemAccessDeniedHandler;
 import com.partnerguard.common.security.ProblemAuthenticationEntryPoint;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.JwkSetUriJwtDecoderBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +26,9 @@ import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -30,7 +38,8 @@ import java.time.Duration;
  * by default (ADR-0005, specs/authorization.md): outside the public paths and {@code /api/**}
  * everything is refused, every {@code /api/**} request passes the caller gate
  * ({@link ApiCallerAuthorizationManager}), and each controller method names its roles with
- * {@code @PreAuthorize}.
+ * {@code @PreAuthorize}. Two rate-limit filters (ADR-0006) sit around JWT validation: a per-IP
+ * ceiling before it and per-user limits after it.
  *
  * <p>The {@code JwtDecoder} is Spring Boot's, built from
  * {@code spring.security.oauth2.resourceserver.jwt.issuer-uri} and {@code audiences}: it checks
@@ -40,6 +49,7 @@ import java.time.Duration;
  */
 @Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
+@EnableConfigurationProperties(RateLimitProperties.class)
 class SecurityConfig {
 
     /** Allowed clock skew for {@code exp} and {@code nbf} (rule 2). */
@@ -49,6 +59,7 @@ class SecurityConfig {
     SecurityFilterChain apiSecurity(HttpSecurity http, ProblemAuthenticationEntryPoint entryPoint,
                                     ProblemAccessDeniedHandler accessDeniedHandler,
                                     ApiCallerAuthorizationManager apiCallers,
+                                    RateLimitBuckets rateLimitBuckets, RateLimitRejections rateLimitRejections,
                                     @Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled) {
         http
                 // No sessions and no cookies (rule 4), so there is nothing for CSRF to ride on.
@@ -58,6 +69,12 @@ class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
+                // Rate limits (ADR-0006): a per-IP ceiling before the token is read, then per-user
+                // limits on the verified sub, before any authorization decision.
+                .addFilterBefore(new PreAuthRateLimitFilter(rateLimitBuckets, rateLimitRejections),
+                        BearerTokenAuthenticationFilter.class)
+                .addFilterBefore(new UserRateLimitFilter(rateLimitBuckets, rateLimitRejections),
+                        AuthorizationFilter.class)
                 .authorizeHttpRequests(requests -> {
                     // Error dispatches only render a status that was already decided (ADR-0008).
                     requests.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll();

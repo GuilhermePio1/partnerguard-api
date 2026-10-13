@@ -27,7 +27,12 @@ info:
     Every error response uses `application/problem+json` (RFC 7807, ADR-0008).
 
     ### Rate limiting
-    Exceeding a limit returns `429` with a `Retry-After` header (ADR-0006).
+    Exceeding a limit returns `429` with a `Retry-After` header in whole
+    seconds (ADR-0006, ADR-0022). Before the token is validated, every request
+    counts against a per-IP ceiling (120/min). After validation, each user
+    (the token's verified `sub`) gets 60 requests/min, of which at most 20/min
+    may be writes (`POST`, `PUT`, `PATCH`, `DELETE`); requests without a token
+    get 60/min per IP. All limits are configurable.
   contact:
     name: PartnerGuard maintainers
   license:

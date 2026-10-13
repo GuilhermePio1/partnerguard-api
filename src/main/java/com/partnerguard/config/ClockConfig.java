@@ -9,7 +9,7 @@ import java.time.Clock;
 class ClockConfig {
 
     /**
-     * The one source of "now" for security decisions (token expiry, later rate-limit refills),
+     * The one source of "now" for security decisions (token expiry, rate-limit refills),
      * so tests can move time with a fake clock instead of sleeping.
      */
     @Bean

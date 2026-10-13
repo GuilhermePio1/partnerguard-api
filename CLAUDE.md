@@ -6,10 +6,9 @@ Bucket4j. The point of the project is **security that is specified, decided and
 tested**. Treat every security rule as a requirement with a test, not a
 nice-to-have.
 
-Status: milestone 4 done (roles, ownership, field permissions, caller gate for
-misconfigured and suspended partners; AUTHZ-01..22 green; CLM-22/23 wait for the
-audit log in milestone 6). Next: milestone 5,
-rate limiting (`README.md` §13).
+Status: milestone 5 done (two-layer rate limiting in `common.ratelimit`;
+RL-01..13 green; CLM-22/23 wait for the audit log in milestone 6). Next:
+milestone 6, OWASP hardening (`README.md` §13).
 
 Controllers get scope, role and partner id **only** from `CallerContext`
 (`common.caller.JwtCallerContext`, built from the validated JWT).
@@ -85,6 +84,9 @@ scripts/env-up.sh | scripts/smoke-test.sh | scripts/rate-limit-check.sh
   `support.ApiIntegrationTest` authenticates every request as ADMIN by
   default (`SecurityTestTokens`); `support.KeycloakIntegrationTest` adds a
   shared Keycloak container (same image tag as Compose; keep them in sync).
+  `support.PostgresIntegrationTest` sets the rate limits very high so tests
+  don't trip them; rate-limit tests lower them with their own
+  `@TestPropertySource` and pin `support.TestClockConfig`'s `MutableClock`.
   `support.SchemaOwner` changes rows the app role can't write (e.g. partner
   status); it commits outside the test transaction, so undo it in `@AfterEach`.
 - If port 5432 is taken, set `POSTGRES_PORT` in `.env`; Compose and the `local`

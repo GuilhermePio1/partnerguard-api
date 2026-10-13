@@ -53,6 +53,14 @@ springdoc:
   # Document exactly what the contract declares; no codes inferred from the controller advice.
   override-with-generic-response: false
 
+partnerguard:
+  # Requests per minute (specs/rate-limiting.md, ADR-0006). Tests use small values.
+  rate-limit:
+    ip-ceiling-per-minute: 120
+    user-per-minute: 60
+    user-writes-per-minute: 20
+    anonymous-per-minute: 60
+
 management:
   endpoints:
     web:

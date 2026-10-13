@@ -10,7 +10,7 @@ PowerShell 5.1+ and PowerShell 7+). Both versions behave the same.
 | `env-down` | `docker compose down`; with `--volumes` / `-Volumes` also deletes the data (resets the seed) |
 | `get-token` | Prints an access token for a fixture user (`admin`, `analyst`, `shop-a`) |
 | `smoke-test` | Calls the running API with each role and checks the status codes from the specs. Exit code 1 if any check fails |
-| `rate-limit-check` | Sends requests as one user until it gets `429`, then checks `Retry-After` and the Problem Details body |
+| `rate-limit-check` | Sends up to `MAX_CALLS` requests as one user over one connection, then checks the first `429`: `Retry-After` and the Problem Details body |
 
 ## Usage
 
@@ -67,7 +67,8 @@ Environment variables (same names in both shells):
   `env-down --volumes` and `env-up`.
 - `rate-limit-check` empties the user's bucket. Wait about a minute before
   running `smoke-test` again with the same user.
-- Requirements: `curl` 7.76+ (ships with Windows 10+ as `curl.exe`) and Docker
+- Requirements: `curl` 7.84+ (`rate-limit-check` reads `Retry-After` with
+  `%header{}`; current Windows 10/11 builds ship `curl.exe` 8.x) and Docker
   Compose v2. No `jq` needed.
 - After `git init`, mark the Bash scripts executable:
   `git update-index --chmod=+x scripts/*.sh`.

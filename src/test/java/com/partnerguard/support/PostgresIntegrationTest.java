@@ -2,6 +2,7 @@ package com.partnerguard.support;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.MountableFile;
 
@@ -11,7 +12,18 @@ import org.testcontainers.utility.MountableFile;
  * <p>One container is shared by all test classes. It runs the same init script as
  * docker-compose.yml, so tests use the same two roles as local development: Flyway
  * migrates as the schema owner, the application connects as the non-owner role (ADR-0015).
+ *
+ * <p>Rate limits are set high enough that no test trips them by accident: every MockMvc request
+ * comes from 127.0.0.1, most as the same user, and Spring caches contexts across classes.
+ * The rate-limit tests set small limits with their own {@code @TestPropertySource}, which
+ * overrides these key by key.
  */
+@TestPropertySource(properties = {
+        "partnerguard.rate-limit.ip-ceiling-per-minute=1000000",
+        "partnerguard.rate-limit.user-per-minute=1000000",
+        "partnerguard.rate-limit.user-writes-per-minute=1000000",
+        "partnerguard.rate-limit.anonymous-per-minute=1000000"
+})
 public abstract class PostgresIntegrationTest {
 
     protected static final String APP_DB_USER = "partnerguard_app";

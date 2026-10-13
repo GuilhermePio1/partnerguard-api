@@ -3,7 +3,8 @@
 ## Scope
 
 Per-IP and per-user request limits. Related:
-[ADR-0006](../docs/adr/0006-two-layer-rate-limiting.md).
+[ADR-0006](../docs/adr/0006-two-layer-rate-limiting.md),
+[ADR-0022](../docs/adr/0022-rate-limit-anonymous-bucket-and-refusals.md).
 
 ## Rules
 
@@ -14,11 +15,22 @@ Per-IP and per-user request limits. Related:
    - authenticated callers: a bucket per verified `sub`, **60 req/min**;
    - write operations (`POST`, `PUT`, `PATCH`, `DELETE`) also consume from a
      second bucket per `sub`, **20 req/min**;
-   - anonymous callers (public paths): a bucket per IP, **60 req/min**.
+   - anonymous callers: a bucket per IP, **60 req/min**. Anonymous means any
+     request that reaches layer 2 without an authentication, whatever the path:
+     the public paths (`/actuator/health` included) and protected paths called
+     without a token, which consume the anonymous bucket before they get their
+     `401`. A request with an invalid token never reaches layer 2: JWT
+     validation answers `401` first.
 3. Buckets refill greedily over the minute (Bucket4j `refillGreedy`), not in
    one burst at the end of the window.
-4. A request that is rejected by a filter consumes from that filter's bucket.
-   A layer-1 rejection never reaches JWT validation.
+4. A request takes one token from each layer it reaches, and no more:
+   - a request rejected by JWT validation (`401`) has already taken its
+     layer-1 token;
+   - a layer-1 rejection never reaches JWT validation or layer 2;
+   - a rejected request takes nothing from the buckets of the layer that
+     rejected it. A write refused by the write bucket doesn't spend the user
+     bucket, and a write refused by the user bucket doesn't spend the write
+     bucket. A caller who waits `Retry-After` therefore gets through.
 5. Over the limit → `429` Problem Details
    (`type: https://problems.partnerguard.example/rate-limit-exceeded`) with
    `Retry-After` in whole seconds (rounded up, ≥ 1).
@@ -39,7 +51,7 @@ Per-IP and per-user request limits. Related:
 
 ## Acceptance criteria
 
-Tests use small configured limits (e.g. 5/3/2/3) to stay fast.
+Tests use small configured limits (e.g. 10/3/2/3) to stay fast.
 
 | ID | Given / When / Then | Type |
 |---|---|---|
@@ -53,6 +65,13 @@ Tests use small configured limits (e.g. 5/3/2/3) to stay fast.
 | RL-08 | Given a request with `X-Forwarded-For: 1.2.3.4` and no trusted proxy configured, then the bucket key is the socket address | Unit |
 | RL-09 | Given 200,000 distinct keys, then the cache holds at most 100,000 buckets | Unit |
 | RL-10 | Given the local stack, `scripts/rate-limit-check.*` observes `429` with `Retry-After` and Problem Details within 100 calls (greedy refill adds about one token per second, so the first `429` arrives a few calls after the 60th) | Script |
+| RL-11 | Given a key over its limit, when it gets several `429` within a minute, then exactly one `event=rate_limited` log line with the key type, the key and the path; after a minute (fake clock), the next `429` logs again | Slice |
+| RL-12 | Given anonymous calls to `GET /api/v1/claims` without a token, when sending `anonymous-per-minute + 1` of them, then the last one is `429`, not `401` | Slice |
+| RL-13 | Given the IP ceiling is exhausted, when a request with a token arrives from that IP, then `429` and the token is never decoded | Slice |
+
+With the example limits, RL-02 needs `ip-ceiling-per-minute ≥ user-per-minute + 2`
+(both users share one IP), and RL-03 needs `user-per-minute ≥ user-writes-per-minute + 1`
+so the GET after the refused write still has a token.
 
 ## Open questions
 

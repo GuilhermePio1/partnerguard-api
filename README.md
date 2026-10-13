@@ -9,17 +9,17 @@ authentication, role-based and ownership-based authorization, rate limiting,
 and defenses against the most common OWASP risks. Every security decision is
 written down, specified and tested.
 
-> **Status:** milestone 4 (authorization) is done. Every endpoint in the
+> **Status:** milestone 5 (rate limiting) is done. Every endpoint in the
 > contract works against PostgreSQL with the seed fixtures, errors are Problem
 > Details, and the runtime API docs match the contract. Every request except
 > `/actuator/health` (plus Swagger in the `local` profile) needs a valid
 > Keycloak access token, and roles, ownership and field permissions are
-> enforced. `scripts/smoke-test.*` passes against the local stack.
+> enforced. Requests are rate limited per IP and per user (`429` with
+> `Retry-After`). `scripts/smoke-test.*` and `scripts/rate-limit-check.*` pass
+> against the local stack.
 >
-> **Until milestones 5–6 land, these accepted decisions are not in force yet,
+> **Until milestone 6 lands, these accepted decisions are not in force yet,
 > so run it locally only:**
-> - No rate limiting (ADR-0006): `scripts/rate-limit-check.*` fails by design
->   until milestone 5.
 > - No audit log (ADR-0012); only Spring Security's default security headers.
 
 >
@@ -239,19 +239,26 @@ All list endpoints are paginated (`page` from 0, `size` 1–100, default 20;
   and every partner-scoped `404` as `event=ownership_denied`. The client never
   sees the reason.
 
-### 8.3 Rate limiting ([ADR-0006](docs/adr/0006-two-layer-rate-limiting.md))
+### 8.3 Rate limiting ([ADR-0006](docs/adr/0006-two-layer-rate-limiting.md), [ADR-0022](docs/adr/0022-rate-limit-anonymous-bucket-and-refusals.md))
 
 | Layer | Runs | Key | Limit |
 |---|---|---|---|
 | IP flood ceiling | before JWT validation | client IP | 120 req/min, all requests |
 | User limit | after JWT validation | verified `sub` | 60 req/min |
 | User write limit | after JWT validation | verified `sub` | 20 req/min for `POST/PUT/PATCH/DELETE` |
-| Anonymous limit | after JWT validation | client IP | 60 req/min (public endpoints) |
+| Anonymous limit | after JWT validation | client IP | 60 req/min for requests without a token (`/actuator/health` included) |
 
 - Token buckets (Bucket4j core) with greedy refill, held in a bounded in-memory
   cache. A single local instance is in scope.
-- Exceeding a limit returns `429 Too Many Requests` with `Retry-After` and a
-  Problem Details body.
+- Exceeding a limit returns `429 Too Many Requests` with `Retry-After` (whole
+  seconds) and a Problem Details body.
+- A request takes one token from each layer it reaches. A refused request takes
+  nothing from the layer that refused it, so waiting `Retry-After` is enough;
+  a write refused by one of its two buckets doesn't spend the other.
+- A forged token is refused by JWT validation before layer 2, so it can
+  neither dodge its own limit nor drain another user's bucket.
+- Every `429` is logged as `event=rate_limited` (limit, key type, key, path), at
+  most once per key per minute.
 - `X-Forwarded-For` is ignored unless a trusted proxy is configured.
 
 ### 8.4 OWASP coverage
@@ -292,13 +299,13 @@ partnerguard-api/
 ├── scripts/                  # Local helpers (.sh and .ps1)
 ├── .claude/skills/           # Claude Code skills for this repo
 ├── src/main/java/com/partnerguard/
-│   ├── config/               # Security, rate limiting, OpenAPI
+│   ├── config/               # Security filter chain, clock, Jackson
 │   ├── partner/              # Controller, service, repository, entity, mapper
 │   ├── contract/
 │   ├── claim/
 │   ├── policy/
 │   ├── audit/
-│   └── common/               # Errors, CurrentUser, ownership, masking, validation
+│   └── common/               # Errors, caller identity, security, rate limiting, ownership, masking, validation
 ├── src/main/resources/
 │   ├── application.yml
 │   ├── db/migration/         # Flyway schema migrations
@@ -420,7 +427,7 @@ runs. Surefire reports are uploaded when a run fails.
 | 2 ✅ | Domain and CRUD | Entities, repositories and endpoints working without security; contract drift test green |
 | 3 ✅ | Authentication | Keycloak realm configured; API accepts only valid JWTs (`AUTHN-*`) |
 | 4 ✅ | Authorization | Role, ownership and field checks with full test coverage (`AUTHZ-*`, `CLM-*`) |
-| 5 | Rate limiting | Two-layer Bucket4j limits, with tests (`RL-*`) |
+| 5 ✅ | Rate limiting | Two-layer Bucket4j limits, with tests (`RL-*`) |
 | 6 | OWASP hardening | Validation, masking, headers, error handling and audit log (`HRD-*`, `ERR-*`, `AUD-*`) |
 | 7 | CI and docs | Pipeline green, Swagger complete, README finished, smoke tests pass |
 
