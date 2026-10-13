@@ -7,7 +7,8 @@ Role checks, ownership checks and deny-by-default. Related:
 [ADR-0004](../docs/adr/0004-ownership-checks-in-service-layer.md),
 [ADR-0005](../docs/adr/0005-deny-by-default.md),
 [ADR-0009](../docs/adr/0009-claim-update-field-level-permissions.md),
-[ADR-0016](../docs/adr/0016-security-test-matrix.md).
+[ADR-0016](../docs/adr/0016-security-test-matrix.md),
+[ADR-0021](../docs/adr/0021-reject-mixed-roles-and-block-suspended-partners.md).
 
 ## Rules
 
@@ -19,23 +20,35 @@ Role checks, ownership checks and deny-by-default. Related:
    from the path, query, body or any header other than the token.
 4. A `PARTNER` token with a missing or malformed `partner_id` → `403` on every
    endpoint, before any lookup.
-5. Ownership is enforced in services with scoped queries. A resource owned by
+   A `PARTNER` token that also carries an internal role (`ADMIN` or `ANALYST`)
+   is a misconfigured account too: `403` on every endpoint. Internal roles
+   never widen a partner's view.
+5. A `PARTNER` caller whose `partner_id` names a partner that is `SUSPENDED`
+   or doesn't exist → `403` on every endpoint, `GET /api/v1/partners/me`
+   included. The status is read from the database on every request, never
+   cached or taken from the token, so a suspension also stops tokens that were
+   issued before it.
+6. Ownership is enforced in services with scoped queries. A resource owned by
    another partner → `404`, with a body identical to a missing resource.
-6. List endpoints return only the caller's resources for `PARTNER`; for internal
+7. List endpoints return only the caller's resources for `PARTNER`; for internal
    roles they return everything.
-7. Anything not explicitly allowed is denied: `denyAll()` outside `/api/**` and
+8. Anything not explicitly allowed is denied: `denyAll()` outside `/api/**` and
    the public paths; `@PreAuthorize` required on every controller method.
-8. Public paths: `GET /actuator/health`; in the `local` profile also Swagger UI
+9. Public paths: `GET /actuator/health`; in the `local` profile also Swagger UI
    and `/v3/api-docs/**`. The servlet error dispatch (`DispatcherType.ERROR` to
    `/error`) must be permitted too, or security errors can't be rendered. It is
    served by `common.error.ProblemDetailsErrorController`, which only returns
    Problem Details and is the one controller exempt from `AUTHZ-01`.
-9. Every `403` and ownership `404` is logged (`event=access_denied` /
-   `event=ownership_denied`, `sub`, method, path).
+10. Every `403` and ownership `404` is logged (`event=access_denied` /
+   `event=ownership_denied`, `sub`, method, path). A partner-scoped query can't tell
+   another partner's resource from a missing one without a second query, so
+   every partner-scoped `404` is logged as `ownership_denied`.
 
 ### Access matrix
 
 `✔` = allowed, `—` = `403`, `own` = allowed with ownership (others → `404`).
+The `PARTNER` column assumes a well-configured, `ACTIVE` partner; otherwise
+rules 4 and 5 turn every cell into `403`.
 
 | Operation | ADMIN | ANALYST | PARTNER | Anonymous |
 |---|---|---|---|---|
@@ -72,11 +85,11 @@ Role checks, ownership checks and deny-by-default. Related:
 | AUTHZ-16 | Given a call that results in `403`, then one `access_denied` log event is written | Slice |
 | AUTHZ-17 | Given a call that results in an ownership `404`, then one `ownership_denied` log event is written | Integration |
 | AUTHZ-18 | Ownership checks are applied by the service: calling `ClaimService.get(id, currentUser)` directly (no controller) with Partner A and claim `…b001` throws `ResourceNotFoundException` | Unit |
+| AUTHZ-19 | Given a token with roles `PARTNER` and `ADMIN` (and, separately, `PARTNER` and `ANALYST`) and a valid `partner_id`, when calling `GET /api/v1/claims` or `GET /api/v1/partners`, then `403` | Slice |
+| AUTHZ-20 | Given a `PARTNER` token whose `partner_id` names a `SUSPENDED` partner, when calling each `/api/**` operation, `GET /api/v1/partners/me` included, then `403` | Integration |
+| AUTHZ-21 | Given a valid token for an `ACTIVE` partner, when the partner becomes `SUSPENDED` and the same token is used again, then `403` | Integration |
+| AUTHZ-22 | Given a `PARTNER` token whose `partner_id` is a well-formed UUID of no partner, when calling `GET /api/v1/claims` or `GET /api/v1/partners/me`, then `403` | Integration |
 
 ## Open questions
 
-- A token with both `PARTNER` and an internal role: the API currently treats
-  internal roles as winning (broader view). Should that combination be
-  rejected as a misconfiguration instead?
-- Should a `SUSPENDED` partner's users be blocked (e.g. `403` on everything)?
-  The brief defines the status but no behavior for it.
+- None.

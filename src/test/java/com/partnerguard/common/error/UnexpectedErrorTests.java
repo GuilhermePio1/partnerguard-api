@@ -20,7 +20,7 @@ class UnexpectedErrorTests extends ApiIntegrationTest {
     @Test
     @DisplayName("ERR-03 an unexpected exception is a 500 without SQL, class names or stack traces")
     void unexpectedExceptionIsSanitized() {
-        MvcTestResult result = mvc.get().uri("/test-errors/explode").exchange();
+        MvcTestResult result = mvc.get().uri("/api/test-errors/explode").exchange();
 
         assertProblem(result, 500, "internal-error");
         assertThat(result).bodyJson().extractingPath("$.detail").isEqualTo("An unexpected error occurred.");
@@ -35,7 +35,7 @@ class UnexpectedErrorTests extends ApiIntegrationTest {
     @RestController
     static class ExplodingController {
 
-        @GetMapping("/test-errors/explode")
+        @GetMapping("/api/test-errors/explode")
         String explode() {
             throw new IllegalStateException("SELECT * FROM secret");
         }

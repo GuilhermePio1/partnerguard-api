@@ -26,3 +26,4 @@ creates one and updates this index.
 | [0018](0018-verified-tls-for-database-connections.md) | Require verified TLS (`sslmode=verify-full`) for database connections outside local development | Accepted |
 | [0019](0019-repeatable-seed-and-least-privilege-grants.md) | Seed data as a repeatable migration; least-privilege grants per table | Accepted |
 | [0020](0020-jwt-validation-details.md) | Validate JWTs with Boot's decoder plus a clock-aware expiry check, and challenge with a bare `Bearer` | Accepted |
+| [0021](0021-reject-mixed-roles-and-block-suspended-partners.md) | Reject tokens that mix `PARTNER` with an internal role, and block suspended or unknown partners | Accepted |

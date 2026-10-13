@@ -6,6 +6,7 @@ import com.partnerguard.api.model.ContractPageDto;
 import com.partnerguard.common.caller.CallerContext;
 import com.partnerguard.common.web.SortOptions;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -22,12 +23,14 @@ class ContractController implements ContractsApi {
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'PARTNER')")
     public ResponseEntity<ContractPageDto> listContracts(Integer page, Integer size, String sort) {
         return ResponseEntity.ok(ContractMapper.toPage(contracts.list(caller.ownershipScope(),
                 SortOptions.pageRequest(page, size, sort, SortOptions.CONTRACTS))));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'PARTNER')")
     public ResponseEntity<ContractDto> getContract(UUID id) {
         return ResponseEntity.ok(ContractMapper.toDto(contracts.get(caller.ownershipScope(), id)));
     }

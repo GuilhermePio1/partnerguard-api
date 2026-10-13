@@ -1,6 +1,6 @@
 package com.partnerguard.contract;
 
-import com.partnerguard.common.error.ResourceNotFoundException;
+import com.partnerguard.common.ownership.OwnershipDenials;
 import com.partnerguard.common.ownership.OwnershipScope;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +33,6 @@ class ContractService {
             case OwnershipScope.Unrestricted ignored -> contracts.findById(id);
             case OwnershipScope.PartnerOnly(var partnerId) -> contracts.findByIdAndPartnerId(id, partnerId);
         };
-        return contract.orElseThrow(ResourceNotFoundException::new);
+        return contract.orElseThrow(() -> OwnershipDenials.notFound(scope, "contract", id));
     }
 }

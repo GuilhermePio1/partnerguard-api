@@ -9,24 +9,19 @@ authentication, role-based and ownership-based authorization, rate limiting,
 and defenses against the most common OWASP risks. Every security decision is
 written down, specified and tested.
 
-> **Status:** milestone 3 (authentication) is done. Every endpoint in the
+> **Status:** milestone 4 (authorization) is done. Every endpoint in the
 > contract works against PostgreSQL with the seed fixtures, errors are Problem
-> Details, the runtime API docs match the contract, and every request except
+> Details, and the runtime API docs match the contract. Every request except
 > `/actuator/health` (plus Swagger in the `local` profile) needs a valid
-> Keycloak access token.
+> Keycloak access token, and roles, ownership and field permissions are
+> enforced. `scripts/smoke-test.*` passes against the local stack.
 >
-> **Until milestones 4–6 land, these accepted decisions are not in force yet,
+> **Until milestones 5–6 land, these accepted decisions are not in force yet,
 > so run it locally only:**
-> - No role or field checks (ADR-0005, ADR-0009): any valid token gets the
->   internal view of all partners' data, and `PATCH /claims/{id}` applies any
->   field, as ADMIN would. The `partner_id` claim isn't read yet, so
->   `GET /partners/me` fails closed with `403` for everyone. Ownership scoping
->   exists in the services and is tested there, but nothing selects the
->   partner scope yet. Paths outside `/api/**` aren't `denyAll` yet.
-> - No rate limiting (ADR-0006), no audit log (ADR-0012); only Spring
->   Security's default security headers.
-> - `scripts/smoke-test.*` and `scripts/rate-limit-check.*` expect those rules
->   and fail by design until milestone 5.
+> - No rate limiting (ADR-0006): `scripts/rate-limit-check.*` fails by design
+>   until milestone 5.
+> - No audit log (ADR-0012); only Spring Security's default security headers.
+
 >
 > The original brief is
 > [`partnerguard-api.md`](partnerguard-api.md). This README supersedes it where
@@ -150,6 +145,10 @@ The partner's identity comes from the `partner_id` claim in the token, never
 from the request body, path, query or headers. A `PARTNER` token without a
 valid `partner_id` is rejected with `403`, so a misconfigured account fails
 closed ([ADR-0003](docs/adr/0003-roles-and-partner-identity-from-token.md)).
+The same `403` on every endpoint applies to a `PARTNER` token that also carries
+`ADMIN` or `ANALYST`, and to a partner that is `SUSPENDED` or doesn't exist.
+The status is checked on every request, so a suspension also stops tokens
+already issued ([ADR-0021](docs/adr/0021-reject-mixed-roles-and-block-suspended-partners.md)).
 
 ### Ownership rule
 
@@ -226,10 +225,19 @@ All list endpoints are paginated (`page` from 0, `size` 1–100, default 20;
   (`findByIdAndPartnerId`), so they apply no matter which controller calls
   them.
 - Deny by default: anything without an explicit rule is blocked. Only
-  `/actuator/health` (and Swagger in `local`) is public.
-- Status code rules: no or invalid token → `401`; wrong role, forbidden field
-  or partner without `partner_id` → `403`; another partner's resource → `404`
-  (same as missing).
+  `/actuator/health` (and Swagger in `local`) is public; outside `/api/**`
+  everything else is `403`.
+- Every `/api/**` request first passes a caller gate: misconfigured partner
+  accounts (no valid `partner_id`, or an internal role as well) and partners
+  that are `SUSPENDED` or don't exist get `403`, with the partner's status read
+  from the database on every request
+  ([ADR-0021](docs/adr/0021-reject-mixed-roles-and-block-suspended-partners.md)).
+- Status code rules: no or invalid token → `401`; wrong role, forbidden field,
+  misconfigured, suspended or unknown partner → `403`; another partner's
+  resource → `404` (same as missing).
+- Every `403` is logged as `event=access_denied` (sub, method, path, reason)
+  and every partner-scoped `404` as `event=ownership_denied`. The client never
+  sees the reason.
 
 ### 8.3 Rate limiting ([ADR-0006](docs/adr/0006-two-layer-rate-limiting.md))
 
@@ -411,7 +419,7 @@ runs. Surefire reports are uploaded when a run fails.
 | 1 ✅ | Project setup | Spring Boot app, PostgreSQL and Flyway running in Docker Compose; openapi-generator + Spring Boot 4 compatibility confirmed (ADR-0007) |
 | 2 ✅ | Domain and CRUD | Entities, repositories and endpoints working without security; contract drift test green |
 | 3 ✅ | Authentication | Keycloak realm configured; API accepts only valid JWTs (`AUTHN-*`) |
-| 4 | Authorization | Role, ownership and field checks with full test coverage (`AUTHZ-*`, `CLM-*`) |
+| 4 ✅ | Authorization | Role, ownership and field checks with full test coverage (`AUTHZ-*`, `CLM-*`) |
 | 5 | Rate limiting | Two-layer Bucket4j limits, with tests (`RL-*`) |
 | 6 | OWASP hardening | Validation, masking, headers, error handling and audit log (`HRD-*`, `ERR-*`, `AUD-*`) |
 | 7 | CI and docs | Pipeline green, Swagger complete, README finished, smoke tests pass |
@@ -437,8 +445,7 @@ runs. Surefire reports are uploaded when a run fails.
 
 These are not decided yet and are not implemented. Each is tracked in its spec:
 
-- Behavior for `SUSPENDED` partners ([authorization](specs/authorization.md#open-questions)).
-- Tokens carrying both `PARTNER` and an internal role ([authorization](specs/authorization.md#open-questions)).
+- An endpoint to change a partner's status ([partners](specs/partners.md#open-questions)).
 - Masking of `holderName`/`vehiclePlate` under LGPD ([policies](specs/policies.md#open-questions)).
 - ADMIN edits on final-state claims; optimistic locking ([claims](specs/claims.md#open-questions)).
 

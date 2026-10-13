@@ -70,15 +70,16 @@ class ErrorDispatchTests extends PostgresIntegrationTest {
 
     @ParameterizedTest(name = "Accept: {0}")
     @ValueSource(strings = {"text/html", "application/json"})
-    @DisplayName("ERR-08 GET /error directly is a 404 Problem Details, not Boot's status 999")
+    @DisplayName("ERR-08 GET /error directly is a 403 Problem Details (deny by default), not Boot's status 999")
     void directErrorRequest(String accept) throws Exception {
-        // An authenticated caller: anonymous ones are stopped by authentication first (ADR-0005).
+        // /error is outside /api/** and not an error dispatch, so even an authenticated caller is
+        // refused (ADR-0005); anonymous callers would get the 401 first.
         when(jwtDecoder.decode("test-token")).thenReturn(Jwt.withTokenValue("test-token")
                 .header("alg", "RS256").subject("test").issuedAt(Instant.now()).build());
 
         HttpResponse<String> response = get("/error", accept, "Bearer test-token");
 
-        assertProblem(response, 404, "not-found", "/error");
+        assertProblem(response, 403, "forbidden", "/error");
     }
 
     @ParameterizedTest(name = "Accept: {0}")

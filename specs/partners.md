@@ -13,7 +13,7 @@ Related: [ADR-0010](../docs/adr/0010-cnpj-validation-and-masking.md),
 | `id` | UUID | Generated |
 | `legalName` | string | 3–200 chars, plain text (ADR-0013) |
 | `taxId` | CNPJ | Numeric or alphanumeric, check digits validated, stored normalized, unique, **always masked in responses** |
-| `status` | `ACTIVE` \| `SUSPENDED` | New partners are `ACTIVE` |
+| `status` | `ACTIVE` \| `SUSPENDED` | New partners are `ACTIVE`. A `SUSPENDED` partner's users get `403` everywhere ([authorization](authorization.md) rule 5) |
 
 ## Rules
 
@@ -21,7 +21,8 @@ Related: [ADR-0010](../docs/adr/0010-cnpj-validation-and-masking.md),
 2. `POST /partners` (ADMIN): creates an `ACTIVE` partner. Write operation:
    audit entry `PARTNER_CREATED`, write rate limit.
 3. `GET /partners/me` (PARTNER): the partner whose id is the token's
-   `partner_id`. If the claim points at no existing partner → `404`.
+   `partner_id`. If the claim points at no existing partner, or at a
+   `SUSPENDED` one → `403` ([authorization](authorization.md) rule 5).
 4. `taxId` input accepts `NN.NNN.NNN/NNNN-NN` or 14 characters with no
    punctuation. The first 12 may be letters (uppercased on input).
 5. `taxId` output is always `**.***.***/****-DD`, where `DD` are the check digits.
@@ -42,12 +43,11 @@ Related: [ADR-0010](../docs/adr/0010-cnpj-validation-and-masking.md),
 | PRT-08 | Given `admin`, when creating with `legalName` `<script>alert(1)</script>`, then `400` | Slice |
 | PRT-09 | Given `admin`, when creating with an extra `"status":"SUSPENDED"` property, then `400` (unknown/forbidden property) | Slice |
 | PRT-10 | Given `shop-a`, when `GET /partners/me`, then `200` with id `10000000-…000a` and `taxId = "**.***.***/****-81"` | Integration |
-| PRT-11 | Given a `PARTNER` token with `partner_id` of a partner that doesn't exist, when `GET /partners/me`, then `404` | Integration |
+| PRT-11 | Given a `PARTNER` token with `partner_id` of a partner that doesn't exist, when `GET /partners/me`, then `403` (ADR-0021) | Integration |
 | PRT-12 | Given a successful create, then one audit entry `PARTNER_CREATED` with `resource = partner:<id>` and `userId = admin's sub` | Integration |
 | PRT-13 | Given a CNPJ check-digit unit test, then `11222333000181`, `98765432000198`, `12ABC34501DE35` are valid and changing any single character makes them invalid | Unit |
 | PRT-14 | `Partner.toString()` and log output never contain the unmasked `taxId` | Unit |
 
 ## Open questions
 
-- Behavior of `SUSPENDED` partners (see [authorization](authorization.md#open-questions)).
 - Is there an endpoint to change a partner's status? Not in the brief.

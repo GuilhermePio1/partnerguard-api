@@ -73,7 +73,7 @@ All ids from [fixtures](fixtures.md).
 | CLM-15 | Given `shop-a`, when `PATCH …a002 {"description":"x"}` (`UNDER_REVIEW`), then `409` | Integration |
 | CLM-16 | Given `admin`, when `PATCH …a001 {"amount": 1300.00, "description":"Revised"}`, then `200` | Integration |
 | CLM-17 | Given any role, when `PATCH` with `{"partnerId":"10000000-…000b"}`, then `400` | Slice |
-| CLM-18 | Parameterized role × field test covers all 9 cells of the permission table | Unit |
+| CLM-18 | Parameterized role × field test covers all 9 cells of the permission table | Slice |
 | CLM-19 | Given `PATCH {}`, then `400` (at least one field) | Slice |
 | CLM-20 | Given `PATCH {"description": null}`, then `400` | Slice |
 | CLM-21 | Given `PATCH {"amount": 0}` or `{"amount": 10.001}`, then `400` | Slice |

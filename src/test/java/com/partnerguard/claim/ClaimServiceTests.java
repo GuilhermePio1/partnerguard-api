@@ -1,5 +1,6 @@
 package com.partnerguard.claim;
 
+import com.partnerguard.common.caller.Role;
 import com.partnerguard.common.error.ResourceNotFoundException;
 import com.partnerguard.common.ownership.OwnershipScope;
 import com.partnerguard.support.PostgresIntegrationTest;
@@ -56,7 +57,7 @@ class ClaimServiceTests extends PostgresIntegrationTest {
     @Test
     @DisplayName("CLM-14 another partner's claim can't be updated, and stays unchanged")
     void otherPartnersClaimCannotBeUpdated() {
-        assertThatThrownBy(() -> claims.update(PARTNER_A_SCOPE, CLAIM_B1, new ClaimChanges(null, "x", null)))
+        assertThatThrownBy(() -> claims.update(Role.PARTNER, PARTNER_A_SCOPE, CLAIM_B1, new ClaimChanges(null, "x", null)))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         assertThat(claims.get(OwnershipScope.unrestricted(), CLAIM_B1).getDescription())

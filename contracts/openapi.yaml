@@ -19,6 +19,9 @@ info:
     Calls from other roles get `403`. For `PARTNER` users, resources that belong
     to another partner are reported as `404`, exactly like resources that do not
     exist (see ADR-0004).
+    A `PARTNER` caller gets `403` on every operation when its token lacks a valid
+    `partner_id`, also carries an internal role, or names a partner that is
+    `SUSPENDED` or does not exist (ADR-0003, ADR-0021).
 
     ### Errors
     Every error response uses `application/problem+json` (RFC 7807, ADR-0008).
@@ -110,7 +113,8 @@ paths:
       summary: Current partner's profile
       description: |
         Resolved from the `partner_id` claim of the token, never from the request.
-        A `PARTNER` token without a valid `partner_id` claim gets `403`.
+        A `PARTNER` token without a valid `partner_id` claim gets `403`, and so does
+        one whose partner is `SUSPENDED` or does not exist.
       x-required-roles: [PARTNER]
       responses:
         '200':
@@ -392,7 +396,7 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
     Forbidden:
-      description: The caller's role may not perform this operation or change these fields.
+      description: The caller's role may not perform this operation or change these fields, or the caller is a misconfigured, suspended or unknown partner.
       content:
         application/problem+json:
           schema:

@@ -1,11 +1,14 @@
 package com.partnerguard.partner;
 
 import com.partnerguard.support.ApiIntegrationTest;
+import com.partnerguard.support.SecurityTestTokens;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
+import static com.partnerguard.support.Fixtures.NEVER_EXISTS;
+import static com.partnerguard.support.Fixtures.PARTNER_A;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PartnerApiTests extends ApiIntegrationTest {
@@ -140,9 +143,27 @@ class PartnerApiTests extends ApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("PRT-10 a partner reads its own profile, with the tax ID masked")
+    void partnerReadsOwnProfile() {
+        MvcTestResult result = mvc.get().uri("/api/v1/partners/me").with(SecurityTestTokens.partnerA()).exchange();
+
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.id").isEqualTo(PARTNER_A.toString());
+        assertThat(result).bodyJson().extractingPath("$.taxId").isEqualTo("**.***.***/****-81");
+    }
+
+    @Test
+    @DisplayName("PRT-11 a partner_id that names no partner gets 403 on /partners/me")
+    void unknownPartnerHasNoProfile() {
+        assertProblem(mvc.get().uri("/api/v1/partners/me").with(SecurityTestTokens.partner(NEVER_EXISTS)).exchange(),
+                403, "forbidden");
+    }
+
+    @Test
     @DisplayName("ADR-0003 without a partner identity, /partners/me fails closed with 403")
     void currentPartnerRequiresPartnerIdentity() {
-        assertProblem(mvc.get().uri("/api/v1/partners/me").exchange(), 403, "forbidden");
+        assertProblem(mvc.get().uri("/api/v1/partners/me").with(SecurityTestTokens.partnerWithoutPartnerId())
+                .exchange(), 403, "forbidden");
     }
 
     private MvcTestResult post(String json) {

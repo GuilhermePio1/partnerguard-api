@@ -1,6 +1,7 @@
 package com.partnerguard.policy;
 
 import com.partnerguard.support.ApiIntegrationTest;
+import com.partnerguard.support.SecurityTestTokens;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
@@ -19,6 +20,13 @@ class PolicyApiTests extends ApiIntegrationTest {
         assertThat(result).hasStatusOk();
         assertThat(result).bodyJson().extractingPath("$.holderName").isEqualTo("Maria Silva");
         assertThat(result).bodyJson().extractingPath("$.vehiclePlate").isEqualTo("ABC1D23");
+    }
+
+    @Test
+    @DisplayName("POL-02 a partner can't look up policies")
+    void partnerCannotLookUpPolicies() {
+        assertProblem(mvc.get().uri("/api/v1/policies/{number}", POLICY_1).with(SecurityTestTokens.partnerA())
+                .exchange(), 403, "forbidden");
     }
 
     @Test

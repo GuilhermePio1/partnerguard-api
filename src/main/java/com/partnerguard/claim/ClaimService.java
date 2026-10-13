@@ -1,6 +1,9 @@
 package com.partnerguard.claim;
 
-import com.partnerguard.common.error.ResourceNotFoundException;
+import com.partnerguard.common.caller.Role;
+import com.partnerguard.common.error.ProblemException;
+import com.partnerguard.common.error.ProblemType;
+import com.partnerguard.common.ownership.OwnershipDenials;
 import com.partnerguard.common.ownership.OwnershipScope;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,19 +40,23 @@ class ClaimService {
             case OwnershipScope.Unrestricted ignored -> claims.findById(id);
             case OwnershipScope.PartnerOnly(var partnerId) -> claims.findByIdAndPartnerId(id, partnerId);
         };
-        return claim.orElseThrow(ResourceNotFoundException::new);
+        return claim.orElseThrow(() -> OwnershipDenials.notFound(scope, "claim", id));
     }
 
     /**
-     * Applies a PATCH. Order (ADR-0009): the controller has validated the body (400); then
-     * ownership-scoped lookup (404); then state rules (409).
+     * Applies a PATCH. Order (specs/claims.md rule 4, ADR-0009): the controller has validated
+     * the body (400); then field permissions for the editor's role (403), before any lookup;
+     * then the ownership-scoped lookup (404); then state rules (409).
      *
-     * <p>Milestone 4 inserts the field-permission check (403) before the lookup, and the
-     * PARTNER-only-while-SUBMITTED rule; milestone 6 adds the audit entry in this transaction.
+     * <p>Milestone 6 adds the audit entry in this transaction.
      */
     @Transactional
-    public Claim update(OwnershipScope scope, UUID id, ClaimChanges changes) {
+    public Claim update(Role editor, OwnershipScope scope, UUID id, ClaimChanges changes) {
+        ClaimPermissions.check(editor, changes);
         Claim claim = get(scope, id);
+        if (editor == Role.PARTNER && claim.getStatus() != ClaimStatus.SUBMITTED) {
+            throw new ProblemException(ProblemType.CLAIM_NOT_EDITABLE);
+        }
         if (changes.status() != null) {
             claim.changeStatus(changes.status());
         }
