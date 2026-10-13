@@ -86,6 +86,11 @@ try {
 
     Write-Host "Running checks against $apiUrl"
 
+    $jwtPattern = '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'
+    Test-Condition AUTHN-13 'get-token returns a JWT for admin'   ($admin -cmatch $jwtPattern)
+    Test-Condition AUTHN-13 'get-token returns a JWT for analyst' ($analyst -cmatch $jwtPattern)
+    Test-Condition AUTHN-13 'get-token returns a JWT for shop-a'  ($shopA -cmatch $jwtPattern)
+
     # Authentication and public endpoints
     Test-Status AUTHN-01 401 GET  '/api/v1/claims' ''
     Test-Status AUTHZ-14 200 GET  '/actuator/health' ''

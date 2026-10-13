@@ -81,9 +81,10 @@ class ApplicationStartupTests extends PostgresIntegrationTest {
     @Test
     @DisplayName("DOC-02 outside the local profile, API docs and Swagger UI are not served")
     void apiDocsHiddenOutsideLocalProfile() {
-        assertThat(mvc.get().uri("/v3/api-docs")).hasStatus(404);
-        assertThat(mvc.get().uri("/swagger-ui/index.html")).hasStatus(404);
-        assertThat(mvc.get().uri("/swagger-ui.html")).hasStatus(404);
+        // The spec allows 401 or 404: anonymous callers are stopped by authentication first.
+        for (String path : new String[] {"/v3/api-docs", "/swagger-ui/index.html", "/swagger-ui.html"}) {
+            assertThat(mvc.get().uri(path).exchange().getResponse().getStatus()).isIn(401, 404);
+        }
     }
 
     @Test

@@ -67,12 +67,21 @@ absent() {
   ! grep -Eq "$1" "$2"
 }
 
+# is_jwt <value>  (three base64url segments separated by dots)
+is_jwt() {
+  [[ "$1" =~ ^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$ ]]
+}
+
 echo "Getting tokens..."
 admin="$("$SCRIPT_DIR/get-token.sh" admin)"
 analyst="$("$SCRIPT_DIR/get-token.sh" analyst)"
 shop_a="$("$SCRIPT_DIR/get-token.sh" shop-a)"
 
 echo "Running checks against $API_URL"
+
+check  AUTHN-13 "get-token returns a JWT for admin"   is_jwt "$admin"
+check  AUTHN-13 "get-token returns a JWT for analyst" is_jwt "$analyst"
+check  AUTHN-13 "get-token returns a JWT for shop-a"  is_jwt "$shop_a"
 
 # Authentication and public endpoints
 expect AUTHN-01 401 GET  /api/v1/claims ""

@@ -6,12 +6,13 @@ Bucket4j. The point of the project is **security that is specified, decided and
 tested**. Treat every security rule as a requirement with a test, not a
 nice-to-have.
 
-Status: milestone 2 done (all contract endpoints, seed, Problem Details, DOC-01
-green). Next: milestone 3, Keycloak and JWT validation (`README.md` §13).
+Status: milestone 3 done (Keycloak realm in Compose, JWT validation, AUTHN-01..13
+green). Next: milestone 4, authorization (`README.md` §13).
 
 **Temporary seam:** `common.caller.OpenAccessCallerContext` gives every caller
-the unrestricted scope and no partner id, because there is no authentication
-yet. Milestones 3–4 replace it with a JWT-based `CallerContext` and delete it.
+the unrestricted scope and no partner id: tokens are validated, but roles and
+`partner_id` aren't read yet. Milestone 4 replaces it with a JWT-based
+`CallerContext` and deletes it.
 Controllers must keep getting scope and partner id **only** from `CallerContext`.
 
 ## Where things live
@@ -82,6 +83,9 @@ scripts/env-up.sh | scripts/smoke-test.sh | scripts/rate-limit-check.sh
   `com.partnerguard.api` and `com.partnerguard.api.model`). Never edit it.
 - Integration tests extend `support.PostgresIntegrationTest` (a shared
   Testcontainers PostgreSQL with the same two roles as Compose).
+  `support.ApiIntegrationTest` authenticates every request as ADMIN by
+  default (`SecurityTestTokens`); `support.KeycloakIntegrationTest` adds a
+  shared Keycloak container (same image tag as Compose; keep them in sync).
 - If port 5432 is taken, set `POSTGRES_PORT` in `.env`; Compose and the `local`
   profile both read it. Machine-specific notes go in `CLAUDE.local.md` (git-ignored).
 

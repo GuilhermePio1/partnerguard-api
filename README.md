@@ -9,19 +9,22 @@ authentication, role-based and ownership-based authorization, rate limiting,
 and defenses against the most common OWASP risks. Every security decision is
 written down, specified and tested.
 
-> **Status:** milestone 2 (domain and endpoints) is done. Every endpoint in
-> the contract works against PostgreSQL with the seed fixtures, errors are
-> Problem Details, and the runtime API docs match the contract.
+> **Status:** milestone 3 (authentication) is done. Every endpoint in the
+> contract works against PostgreSQL with the seed fixtures, errors are Problem
+> Details, the runtime API docs match the contract, and every request except
+> `/actuator/health` (plus Swagger in the `local` profile) needs a valid
+> Keycloak access token.
 >
-> **Until milestones 3–6 land, these accepted decisions are not in force yet,
+> **Until milestones 4–6 land, these accepted decisions are not in force yet,
 > so run it locally only:**
-> - No authentication (ADR-0002): the API is open, and every caller gets the
->   internal view of all partners' data. `GET /partners/me` fails closed with
->   `403` because no caller has a partner identity.
-> - No role or field checks (ADR-0005, ADR-0009): `PATCH /claims/{id}` applies
->   any field, as ADMIN would. Ownership scoping exists in the services and is
->   tested there, but nothing selects the partner scope yet.
-> - No rate limiting (ADR-0006), no audit log (ADR-0012), no security headers.
+> - No role or field checks (ADR-0005, ADR-0009): any valid token gets the
+>   internal view of all partners' data, and `PATCH /claims/{id}` applies any
+>   field, as ADMIN would. The `partner_id` claim isn't read yet, so
+>   `GET /partners/me` fails closed with `403` for everyone. Ownership scoping
+>   exists in the services and is tested there, but nothing selects the
+>   partner scope yet. Paths outside `/api/**` aren't `denyAll` yet.
+> - No rate limiting (ADR-0006), no audit log (ADR-0012); only Spring
+>   Security's default security headers.
 > - `scripts/smoke-test.*` and `scripts/rate-limit-check.*` expect those rules
 >   and fail by design until milestone 5.
 >
@@ -196,16 +199,24 @@ All list endpoints are paginated (`page` from 0, `size` 1–100, default 20;
 
 ## 8. Security design
 
-### 8.1 Authentication ([ADR-0002](docs/adr/0002-keycloak-stateless-jwt-resource-server.md))
+### 8.1 Authentication ([ADR-0002](docs/adr/0002-keycloak-stateless-jwt-resource-server.md), [ADR-0020](docs/adr/0020-jwt-validation-details.md))
 
 - The API is an OAuth2 Resource Server and accepts only JWTs signed by Keycloak (RS256).
 - On every request it checks signature, issuer, audience (`partnerguard-api`),
   expiration and not-before, with 30 s clock skew.
 - Access tokens are short-lived (5 minutes). Refresh is handled by the client.
-- No sessions, no cookies, no custom login endpoint. Tokens in query
-  parameters are ignored.
-- `401` responses are Problem Details with `WWW-Authenticate: Bearer` and
-  don't say which check failed. The server log does.
+- Only RS256 is accepted, whatever the JWKS advertises, so `alg: none` and
+  HS256 key-confusion tokens are rejected.
+- No sessions, no cookies, no custom login endpoint. Only the
+  `Authorization` header is read: tokens in query parameters, form bodies or
+  cookies are ignored.
+- `401` responses are Problem Details with a bare `WWW-Authenticate: Bearer`
+  header. Neither the body nor the header says which check failed (Spring's
+  default challenge would name it in `error_description`). The server log
+  does, as `event=authentication_failed` with IP, method, path and reason,
+  never the token.
+- Expiry is checked against one application `Clock` bean, so tests move time
+  instead of sleeping.
 
 ### 8.2 Authorization ([ADR-0004](docs/adr/0004-ownership-checks-in-service-layer.md), [ADR-0005](docs/adr/0005-deny-by-default.md))
 
@@ -320,8 +331,9 @@ On Windows PowerShell: `.\scripts\env-up.ps1` and `.\mvnw.cmd spring-boot:run`.
 
 Check it with `curl http://localhost:8080/actuator/health` (`{"status":"UP"}`).
 
-From milestone 3, this also starts Keycloak (port 8180) with a pre-configured
-realm and three test users:
+This also starts Keycloak (port 8180) with a pre-configured realm and three
+test users. Keycloak keeps no volume, so recreating its container resets the
+realm:
 
 | User | Password | Role |
 |---|---|---|
@@ -398,7 +410,7 @@ runs. Surefire reports are uploaded when a run fails.
 |---|---|---|
 | 1 ✅ | Project setup | Spring Boot app, PostgreSQL and Flyway running in Docker Compose; openapi-generator + Spring Boot 4 compatibility confirmed (ADR-0007) |
 | 2 ✅ | Domain and CRUD | Entities, repositories and endpoints working without security; contract drift test green |
-| 3 | Authentication | Keycloak realm configured; API accepts only valid JWTs (`AUTHN-*`) |
+| 3 ✅ | Authentication | Keycloak realm configured; API accepts only valid JWTs (`AUTHN-*`) |
 | 4 | Authorization | Role, ownership and field checks with full test coverage (`AUTHZ-*`, `CLM-*`) |
 | 5 | Rate limiting | Two-layer Bucket4j limits, with tests (`RL-*`) |
 | 6 | OWASP hardening | Validation, masking, headers, error handling and audit log (`HRD-*`, `ERR-*`, `AUD-*`) |

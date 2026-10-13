@@ -64,7 +64,7 @@ Test types used in the tables:
 | Type | Meaning |
 |---|---|
 | Unit | Plain JUnit 5 + Mockito, no Spring context |
-| Slice | `@WebMvcTest` + `spring-security-test` JWT post-processor |
+| Slice | MockMvc through the full filter chain (`@SpringBootTest` + `@AutoConfigureMockMvc`), with `spring-security-test` JWT post-processors or a stub `JwtDecoder`; no real identity provider |
 | Integration | `@SpringBootTest` + Testcontainers PostgreSQL |
 | E2E-auth | Integration + Keycloak Testcontainer with the realm export |
 | Arch | ArchUnit rule |

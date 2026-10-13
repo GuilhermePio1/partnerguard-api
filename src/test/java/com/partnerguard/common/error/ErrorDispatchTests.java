@@ -6,11 +6,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -19,8 +23,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 /**
  * ERR-08: the servlet /error dispatch only ever produces Problem Details.
@@ -34,6 +40,9 @@ class ErrorDispatchTests extends PostgresIntegrationTest {
 
     @LocalServerPort
     int port;
+
+    @MockitoBean
+    JwtDecoder jwtDecoder;
 
     @ParameterizedTest(name = "Accept: {0}")
     @ValueSource(strings = {"text/html", "application/json", "*/*"})
@@ -63,7 +72,11 @@ class ErrorDispatchTests extends PostgresIntegrationTest {
     @ValueSource(strings = {"text/html", "application/json"})
     @DisplayName("ERR-08 GET /error directly is a 404 Problem Details, not Boot's status 999")
     void directErrorRequest(String accept) throws Exception {
-        HttpResponse<String> response = get("/error", accept);
+        // An authenticated caller: anonymous ones are stopped by authentication first (ADR-0005).
+        when(jwtDecoder.decode("test-token")).thenReturn(Jwt.withTokenValue("test-token")
+                .header("alg", "RS256").subject("test").issuedAt(Instant.now()).build());
+
+        HttpResponse<String> response = get("/error", accept, "Bearer test-token");
 
         assertProblem(response, 404, "not-found", "/error");
     }
@@ -81,11 +94,17 @@ class ErrorDispatchTests extends PostgresIntegrationTest {
     }
 
     private HttpResponse<String> get(String path, String accept) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
-                .header("Accept", accept)
-                .GET()
-                .build();
-        return HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+        return HTTP.send(request(path, accept).build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> get(String path, String accept, String authorization)
+            throws IOException, InterruptedException {
+        return HTTP.send(request(path, accept).header("Authorization", authorization).build(),
+                HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpRequest.Builder request(String path, String accept) {
+        return HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).header("Accept", accept).GET();
     }
 
     private static void assertProblem(HttpResponse<String> response, int status, String slug, String instance) {
@@ -107,7 +126,11 @@ class ErrorDispatchTests extends PostgresIntegrationTest {
     @TestConfiguration
     static class FailingFilters {
 
-        /** Simulates what Spring Security and other filters do: fail before Spring MVC. */
+        /**
+         * Simulates what Spring Security and other filters do: fail before Spring MVC. Runs ahead
+         * of Spring Security, so the request needs no token; the error dispatch it triggers then
+         * goes through Spring Security like any other.
+         */
         @Bean
         FilterRegistrationBean<Filter> failingFilter() {
             Filter filter = (request, response, chain) -> {
@@ -120,6 +143,7 @@ class ErrorDispatchTests extends PostgresIntegrationTest {
             };
             FilterRegistrationBean<Filter> registration = new FilterRegistrationBean<>(filter);
             registration.addUrlPatterns("/test-errors/*");
+            registration.setOrder(SecurityFilterProperties.DEFAULT_FILTER_ORDER - 1);
             return registration;
         }
     }

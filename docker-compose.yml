@@ -1,5 +1,4 @@
 # Local development stack. Credentials below are local-only defaults; override them in .env.
-# Keycloak joins in milestone 3.
 name: partnerguard
 
 services:
@@ -23,6 +22,23 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # Identity provider (ADR-0002). Dev mode with its own embedded store: the realm is
+  # imported from keycloak/realm-export.json when the container is created, so
+  # recreating the container resets users and keys. The issuer is derived from the
+  # request URL (http://localhost:8180/realms/partnerguard); no hostname is pinned, so
+  # Testcontainers can reuse the same realm file on a random port.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      # Temporary admin of the master realm (admin console only), not a PartnerGuard user.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-keycloak-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-keycloak-local}
+    ports:
+      - "127.0.0.1:8180:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
 
 volumes:
   postgres-data:

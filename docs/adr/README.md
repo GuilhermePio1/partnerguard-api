@@ -25,3 +25,4 @@ creates one and updates this index.
 | [0017](0017-add-get-claim-by-id.md) | Add `GET /api/v1/claims/{id}`; defer admin CRUD | Accepted |
 | [0018](0018-verified-tls-for-database-connections.md) | Require verified TLS (`sslmode=verify-full`) for database connections outside local development | Accepted |
 | [0019](0019-repeatable-seed-and-least-privilege-grants.md) | Seed data as a repeatable migration; least-privilege grants per table | Accepted |
+| [0020](0020-jwt-validation-details.md) | Validate JWTs with Boot's decoder plus a clock-aware expiry check, and challenge with a bare `Bearer` | Accepted |

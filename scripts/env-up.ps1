@@ -44,17 +44,13 @@ try {
         $LASTEXITCODE -eq 0
     }
 
-    # Keycloak joins docker-compose.yml in milestone 3.
-    $services = docker compose config --services
-    if ($services -contains 'keycloak') {
-        Wait-Until "Keycloak realm '$realm'" {
-            try {
-                Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 `
-                    -Uri "$keycloakUrl/realms/$realm/.well-known/openid-configuration" | Out-Null
-                $true
-            } catch {
-                $false
-            }
+    Wait-Until "Keycloak realm '$realm'" {
+        try {
+            Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 `
+                -Uri "$keycloakUrl/realms/$realm/.well-known/openid-configuration" | Out-Null
+            $true
+        } catch {
+            $false
         }
     }
 

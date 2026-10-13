@@ -29,9 +29,6 @@ wait_for() {
 }
 
 wait_for "PostgreSQL" docker compose exec -T postgres pg_isready -U "$POSTGRES_USER"
-# Keycloak joins docker-compose.yml in milestone 3.
-if docker compose config --services | grep -qx keycloak; then
-  wait_for "Keycloak realm '$REALM'" curl -sf "$KEYCLOAK_URL/realms/$REALM/.well-known/openid-configuration"
-fi
+wait_for "Keycloak realm '$REALM'" curl -sf "$KEYCLOAK_URL/realms/$REALM/.well-known/openid-configuration"
 
 echo "Environment is up. Start the API with: ./mvnw spring-boot:run"
