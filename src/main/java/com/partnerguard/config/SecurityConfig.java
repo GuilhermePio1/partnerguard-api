@@ -37,8 +37,7 @@ class SecurityConfig {
 
     @Bean
     SecurityFilterChain apiSecurity(HttpSecurity http, ProblemAuthenticationEntryPoint entryPoint,
-                                    @Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled)
-            throws Exception {
+                                    @Value("${springdoc.api-docs.enabled:false}") boolean apiDocsEnabled) {
         http
                 // No sessions and no cookies (rule 4), so there is nothing for CSRF to ride on.
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

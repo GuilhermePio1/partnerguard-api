@@ -49,8 +49,20 @@ public enum ProblemType {
         this.detail = detail;
     }
 
+    public URI type() {
+        return type;
+    }
+
     public HttpStatus status() {
         return status;
+    }
+
+    public String title() {
+        return title;
+    }
+
+    public String detail() {
+        return detail;
     }
 
     public ProblemDetail toProblemDetail() {

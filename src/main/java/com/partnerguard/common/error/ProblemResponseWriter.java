@@ -2,7 +2,6 @@ package com.partnerguard.common.error;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -26,15 +25,15 @@ public class ProblemResponseWriter {
     }
 
     public void write(HttpServletResponse response, ProblemType type, String instance) throws IOException {
-        ProblemDetail problem = type.toProblemDetail();
+        // Read from the catalog entry itself: ProblemDetail's getters are @Nullable.
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("type", problem.getType().toString());
-        body.put("title", problem.getTitle());
-        body.put("status", problem.getStatus());
-        body.put("detail", problem.getDetail());
+        body.put("type", type.type().toString());
+        body.put("title", type.title());
+        body.put("status", type.status().value());
+        body.put("detail", type.detail());
         body.put("instance", instance);
 
-        response.setStatus(problem.getStatus());
+        response.setStatus(type.status().value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         jsonMapper.writeValue(response.getOutputStream(), body);
