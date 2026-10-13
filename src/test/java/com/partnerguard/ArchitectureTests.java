@@ -1,20 +1,30 @@
 package com.partnerguard;
 
+import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaCall;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.repository.Repository;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameMatching;
+import static com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
-/** Package-by-feature rules (ADR-0011) and the @PreAuthorize rule (ADR-0005). */
+/** Package-by-feature rules (ADR-0011), the @PreAuthorize rule (ADR-0005) and the query rule (HRD-08). */
 class ArchitectureTests {
 
     private static final JavaClasses CLASSES = new ClassFileImporter()
@@ -51,6 +61,26 @@ class ArchitectureTests {
                 .and().areDeclaredInClassesThat().areAnnotatedWith(RestController.class)
                 .and().areDeclaredInClassesThat().doNotHaveSimpleName("ProblemDetailsErrorController")
                 .should().beAnnotatedWith(PreAuthorize.class)
+                .check(CLASSES);
+    }
+
+    @Test
+    @DisplayName("HRD-08 no query is built from a runtime string: no createQuery(String), createNativeQuery, JdbcTemplate or JDBC statements")
+    void queriesAreNeverBuiltFromStrings() {
+        // ArchUnit can't see string concatenation, so the rule bans every API that takes a query
+        // string at runtime. @Query values are compile-time constants by Java's rules, so neither
+        // concatenation of request data nor String.format can reach them. Criteria queries
+        // (createQuery(CriteriaQuery)) and Spring Data derived queries stay allowed.
+        DescribedPredicate<JavaCall<?>> jdbcStatement = target(owner(assignableTo(java.sql.Connection.class)))
+                .and(target(nameMatching("prepareStatement|prepareCall|createStatement")));
+        noClasses()
+                .should().callMethod(EntityManager.class, "createQuery", String.class)
+                .orShould().callMethod(EntityManager.class, "createQuery", String.class, Class.class)
+                .orShould().callMethodWhere(target(owner(assignableTo(EntityManager.class)))
+                        .and(target(name("createNativeQuery"))))
+                .orShould().callMethodWhere(jdbcStatement)
+                .orShould().dependOnClassesThat().belongToAnyOf(JdbcTemplate.class, NamedParameterJdbcTemplate.class,
+                        java.sql.Statement.class)
                 .check(CLASSES);
     }
 

@@ -38,16 +38,30 @@ class JwtCallerContext implements CallerContext {
         return caller.isPartner() ? caller.partnerId() : Optional.empty();
     }
 
+    @Override
+    public String subject() {
+        wellConfiguredCaller();
+        String subject = authenticated().getName();
+        if (subject == null || subject.isBlank()) {
+            throw new AccessDeniedException("Token without a subject");
+        }
+        return subject;
+    }
+
     private static Caller wellConfiguredCaller() {
+        Caller caller = Caller.from(authenticated());
+        if (caller.isMisconfiguredPartner()) {
+            throw new AccessDeniedException("Misconfigured partner account");
+        }
+        return caller;
+    }
+
+    private static Authentication authenticated() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken) {
             throw new AccessDeniedException("Not authenticated");
         }
-        Caller caller = Caller.from(authentication);
-        if (caller.isMisconfiguredPartner()) {
-            throw new AccessDeniedException("Misconfigured partner account");
-        }
-        return caller;
+        return authentication;
     }
 }

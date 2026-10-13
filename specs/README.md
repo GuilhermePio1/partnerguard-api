@@ -25,7 +25,7 @@ was made) → README (if user-visible behavior changed)**.
 
 | Spec | Prefix | Milestone |
 |---|---|---|
-| [api-conventions.md](api-conventions.md) | `API`, `DOC`, `ARCH` | 2, 7 |
+| [api-conventions.md](api-conventions.md) | `API`, `DOC`, `ARCH` | 2, 7 (DOC-03) |
 | [fixtures.md](fixtures.md) | — | 1–3 |
 | [authentication.md](authentication.md) | `AUTHN` | 3 |
 | [authorization.md](authorization.md) | `AUTHZ` | 4 |
@@ -36,7 +36,7 @@ was made) → README (if user-visible behavior changed)**.
 | [policies.md](policies.md) | `POL` | 2, 4 |
 | [audit.md](audit.md) | `AUD` | 6 |
 | [errors.md](errors.md) | `ERR` | 6 |
-| [hardening.md](hardening.md) | `HRD` | 6 |
+| [hardening.md](hardening.md) | `HRD` | 6; 7 for the CI scans (HRD-10, HRD-11) |
 
 ## Format
 

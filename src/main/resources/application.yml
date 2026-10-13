@@ -61,6 +61,11 @@ partnerguard:
     user-writes-per-minute: 20
     anonymous-per-minute: 60
 
+logging:
+  pattern:
+    # Every log line carries the request's X-Correlation-Id (specs/errors.md rule 3, ADR-0023).
+    correlation: "[%X{correlationId:-}] "
+
 management:
   endpoints:
     web:

@@ -4,6 +4,9 @@ import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.boot.webmvc.error.ErrorController;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -24,6 +27,8 @@ import java.net.URI;
 @RestController
 public class ProblemDetailsErrorController implements ErrorController {
 
+    private static final Logger log = LoggerFactory.getLogger(ProblemDetailsErrorController.class);
+
     @RequestMapping("${spring.web.error.path:/error}")
     public ResponseEntity<ProblemDetail> handleError(HttpServletRequest request) {
         Object statusCode = request.getAttribute(RequestDispatcher.ERROR_STATUS_CODE);
@@ -33,6 +38,11 @@ public class ProblemDetailsErrorController implements ErrorController {
         }
 
         HttpStatusCode status = toErrorStatus(statusCode);
+        if (status.is5xxServerError()
+                && request.getAttribute(RequestDispatcher.ERROR_EXCEPTION) instanceof Throwable failure) {
+            // Thrown outside Spring MVC (in a filter), so ApiExceptionHandler never saw it (ERR-06).
+            log.error("event=unhandled_exception correlationId={}", MDC.get(CorrelationIdFilter.MDC_KEY), failure);
+        }
         ProblemDetail problem = ProblemType.forStatus(status)
                 .map(ProblemType::toProblemDetail)
                 .orElseGet(() -> ProblemDetail.forStatus(status));

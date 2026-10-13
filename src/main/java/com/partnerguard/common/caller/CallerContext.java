@@ -23,4 +23,7 @@ public interface CallerContext {
 
     /** The caller's partner id, taken from the validated token. Empty for internal callers. */
     Optional<UUID> partnerId();
+
+    /** The validated token's {@code sub}, for the audit log (specs/audit.md). */
+    String subject();
 }

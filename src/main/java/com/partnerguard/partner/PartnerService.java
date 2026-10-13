@@ -1,5 +1,7 @@
 package com.partnerguard.partner;
 
+import com.partnerguard.audit.AuditAction;
+import com.partnerguard.audit.AuditService;
 import com.partnerguard.common.error.ProblemException;
 import com.partnerguard.common.error.ProblemType;
 import com.partnerguard.common.error.ResourceNotFoundException;
@@ -10,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -17,9 +20,11 @@ import java.util.UUID;
 class PartnerService {
 
     private final PartnerRepository partners;
+    private final AuditService audit;
 
-    PartnerService(PartnerRepository partners) {
+    PartnerService(PartnerRepository partners, AuditService audit) {
         this.partners = partners;
+        this.audit = audit;
     }
 
     public Page<Partner> list(Pageable pageable) {
@@ -37,11 +42,15 @@ class PartnerService {
         if (partners.existsByTaxId(normalizedTaxId)) {
             throw new ProblemException(ProblemType.DUPLICATE_TAX_ID);
         }
+        Partner partner;
         try {
-            return partners.saveAndFlush(Partner.create(legalName, normalizedTaxId));
+            partner = partners.saveAndFlush(Partner.create(legalName, normalizedTaxId));
         } catch (DataIntegrityViolationException e) {
             // A concurrent insert won the race on uq_partner_tax_id.
             throw new ProblemException(ProblemType.DUPLICATE_TAX_ID);
         }
+        // Same transaction: if the audit insert fails, the partner isn't created (ADR-0012).
+        audit.record(AuditAction.PARTNER_CREATED, "partner", partner.getId(), List.of("legalName", "taxId"));
+        return partner;
     }
 }

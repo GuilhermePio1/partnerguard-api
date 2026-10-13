@@ -1,0 +1,2 @@
+# Fails startup without verified database TLS outside local/test (ADR-0018).
+org.springframework.boot.EnvironmentPostProcessor=com.partnerguard.config.DatabaseTlsCheck

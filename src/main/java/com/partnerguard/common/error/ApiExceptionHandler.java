@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
@@ -48,7 +49,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> handleUnexpected(Exception ex, WebRequest request) {
-        log.error("Unhandled exception", ex);
+        // The correlation id is also in the X-Correlation-Id response header (ERR-06).
+        log.error("event=unhandled_exception correlationId={}", MDC.get(CorrelationIdFilter.MDC_KEY), ex);
         return respond(ProblemType.INTERNAL_ERROR.toProblemDetail(), request);
     }
 

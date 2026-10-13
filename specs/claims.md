@@ -46,8 +46,9 @@ same status, → `409` (`type: .../invalid-status-transition`).
 4. PATCH evaluation order: validation `400` → field permission `403` →
    ownership `404` → state `409` → apply and audit → `200`.
 5. A successful PATCH writes one audit entry `CLAIM_UPDATED`, `resource =
-   claim:<id>`, `details` = list of changed field names, all in the same
-   transaction.
+   claim:<id>`, `details` = the names of the fields the PATCH carried (`{"fields":["status"]}`),
+   even when a value equals the current one, all in the same transaction
+   (ADR-0023).
 6. PATCH is a write operation (write rate limit).
 
 ## Acceptance criteria

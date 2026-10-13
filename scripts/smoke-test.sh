@@ -97,6 +97,11 @@ expect PRT-10   200 GET  /api/v1/partners/me "$shop_a"
 check  HRD-12 "taxId is masked in /partners/me" grep -q '"\*\*\.\*\*\*\.\*\*\*/\*\*\*\*-81"' "$BODY"
 check  HRD-12 "unmasked taxId is absent" absent '11222333000181|11\.222\.333/0001-81' "$BODY"
 check  HRD-12 "X-Content-Type-Options: nosniff" grep -qi '^X-Content-Type-Options: *nosniff' "$HEADERS"
+check  HRD-01 "Content-Security-Policy: default-src 'none'" grep -qi "^Content-Security-Policy: *default-src 'none'; frame-ancestors 'none'" "$HEADERS"
+check  HRD-01 "X-Frame-Options: DENY" grep -qi '^X-Frame-Options: *DENY' "$HEADERS"
+check  HRD-01 "Referrer-Policy: no-referrer" grep -qi '^Referrer-Policy: *no-referrer' "$HEADERS"
+check  HRD-01 "Cache-Control: no-store" grep -qi '^Cache-Control: *no-store' "$HEADERS"
+check  ERR-06 "X-Correlation-Id is a UUID" grep -qiE '^X-Correlation-Id: *[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$HEADERS"
 
 # Contracts
 expect CTR-04   200 GET  "/api/v1/contracts/$CONTRACT_A" "$shop_a"

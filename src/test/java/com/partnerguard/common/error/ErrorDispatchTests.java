@@ -4,6 +4,7 @@ import com.partnerguard.support.PostgresIntegrationTest;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterProperties;
@@ -24,6 +25,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -92,6 +95,30 @@ class ErrorDispatchTests extends PostgresIntegrationTest {
         assertThat(response.headers().firstValue("Content-Type")).hasValueSatisfying(
                 contentType -> assertThat(contentType).startsWith("application/problem+json"));
         assertThat(JSON.readTree(response.body()).get("status").asInt()).isEqualTo(503);
+    }
+
+    @Test
+    @DisplayName("ERR-06 a 500 from a filter carries a server-generated X-Correlation-Id, not the client's")
+    void correlationIdOnFilterError() throws Exception {
+        HttpResponse<String> response = HTTP.send(request("/test-errors/throw", "application/json")
+                .header("X-Correlation-Id", "planted-by-client").build(), HttpResponse.BodyHandlers.ofString());
+
+        assertThat(response.statusCode()).isEqualTo(500);
+        assertThat(response.headers().allValues("X-Correlation-Id")).hasSize(1);
+        String correlationId = response.headers().firstValue("X-Correlation-Id").orElseThrow();
+        assertThat(UUID.fromString(correlationId).toString()).isEqualTo(correlationId);
+    }
+
+    @Test
+    @DisplayName("HRD-03 on a real server, no response has a Server or X-Powered-By header")
+    void noVersionBanners() throws Exception {
+        // MockMvc has no servlet container, so only a real server shows what Tomcat adds.
+        for (String path : List.of("/actuator/health", "/api/v1/claims", "/test-errors/status/403",
+                "/test-errors/throw")) {
+            HttpResponse<String> response = get(path, "*/*");
+            assertThat(response.headers().firstValue("Server")).as("Server on %s", path).isEmpty();
+            assertThat(response.headers().firstValue("X-Powered-By")).as("X-Powered-By on %s", path).isEmpty();
+        }
     }
 
     private HttpResponse<String> get(String path, String accept) throws IOException, InterruptedException {

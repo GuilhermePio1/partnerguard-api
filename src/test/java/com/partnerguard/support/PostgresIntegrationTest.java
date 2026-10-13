@@ -1,5 +1,6 @@
 package com.partnerguard.support;
 
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
@@ -17,12 +18,23 @@ import org.testcontainers.utility.MountableFile;
  * comes from 127.0.0.1, most as the same user, and Spring caches contexts across classes.
  * The rate-limit tests set small limits with their own {@code @TestPropertySource}, which
  * overrides these key by key.
+ *
+ * <p>Each context's connection pool is small, because Spring keeps every distinct test
+ * context alive and all of them share one database.
+ *
+ * <p>The {@code test} profile is active, which exempts the Testcontainers database from the
+ * verified-TLS startup check (specs/hardening.md rule 15, ADR-0018). Without it, no
+ * integration test could start, so a forgotten profile can't silently disable the check.
  */
+@ActiveProfiles("test")
 @TestPropertySource(properties = {
         "partnerguard.rate-limit.ip-ceiling-per-minute=1000000",
         "partnerguard.rate-limit.user-per-minute=1000000",
         "partnerguard.rate-limit.user-writes-per-minute=1000000",
-        "partnerguard.rate-limit.anonymous-per-minute=1000000"
+        "partnerguard.rate-limit.anonymous-per-minute=1000000",
+        // Spring caches each distinct test context with its own pool; at the default 10
+        // connections, a dozen contexts exceed PostgreSQL's max_connections (100).
+        "spring.datasource.hikari.maximum-pool-size=3"
 })
 public abstract class PostgresIntegrationTest {
 

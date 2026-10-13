@@ -107,6 +107,11 @@ try {
     Test-Condition HRD-12 'taxId is masked in /partners/me' ($meBody.Contains('"**.***.***/****-81"'))
     Test-Condition HRD-12 'unmasked taxId is absent' (-not ($meBody.Contains('11222333000181') -or $meBody.Contains('11.222.333/0001-81')))
     Test-Condition HRD-12 'X-Content-Type-Options: nosniff' ($meHeaders -match '(?im)^X-Content-Type-Options:\s*nosniff')
+    Test-Condition HRD-01 "Content-Security-Policy: default-src 'none'" ($meHeaders -match "(?im)^Content-Security-Policy:\s*default-src 'none'; frame-ancestors 'none'")
+    Test-Condition HRD-01 'X-Frame-Options: DENY' ($meHeaders -match '(?im)^X-Frame-Options:\s*DENY')
+    Test-Condition HRD-01 'Referrer-Policy: no-referrer' ($meHeaders -match '(?im)^Referrer-Policy:\s*no-referrer')
+    Test-Condition HRD-01 'Cache-Control: no-store' ($meHeaders -match '(?im)^Cache-Control:\s*no-store')
+    Test-Condition ERR-06 'X-Correlation-Id is a UUID' ($meHeaders -match '(?im)^X-Correlation-Id:\s*[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
     # Contracts
     Test-Status CTR-04   200 GET  "/api/v1/contracts/$contractA" $shopA

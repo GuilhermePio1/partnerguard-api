@@ -14,7 +14,10 @@ The error format for every response with status ≥ 400. Related:
    table names, library messages, token contents, unmasked tax ids.
 3. `500` uses a fixed `detail` ("An unexpected error occurred."). The server
    logs the full exception with a correlation id. The correlation id is
-   returned in the `X-Correlation-Id` response header on every response.
+   returned in the `X-Correlation-Id` response header on every response,
+   errors from filters included. The server always generates it (a random
+   UUID per request) and ignores any `X-Correlation-Id` the client sends, so a
+   client can't plant ids in the logs (ADR-0023).
 4. Errors produced outside MVC (authentication entry point, access denied
    handler, rate-limit filters, unknown paths) use the same format. Anything
    that reaches the servlet `/error` dispatch is rendered by

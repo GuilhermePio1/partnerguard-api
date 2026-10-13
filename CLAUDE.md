@@ -6,9 +6,10 @@ Bucket4j. The point of the project is **security that is specified, decided and
 tested**. Treat every security rule as a requirement with a test, not a
 nice-to-have.
 
-Status: milestone 5 done (two-layer rate limiting in `common.ratelimit`;
-RL-01..13 green; CLM-22/23 wait for the audit log in milestone 6). Next:
-milestone 6, OWASP hardening (`README.md` §13).
+Status: milestone 6 done (audit log, security headers, correlation ids,
+verified-TLS startup check, error catalog and security-event tests). Next:
+milestone 7, CI scans (HRD-10/11), contract lint (DOC-03) and docs
+(`README.md` §13).
 
 Controllers get scope, role and partner id **only** from `CallerContext`
 (`common.caller.JwtCallerContext`, built from the validated JWT).
@@ -84,9 +85,12 @@ scripts/env-up.sh | scripts/smoke-test.sh | scripts/rate-limit-check.sh
   `support.ApiIntegrationTest` authenticates every request as ADMIN by
   default (`SecurityTestTokens`); `support.KeycloakIntegrationTest` adds a
   shared Keycloak container (same image tag as Compose; keep them in sync).
-  `support.PostgresIntegrationTest` sets the rate limits very high so tests
-  don't trip them; rate-limit tests lower them with their own
-  `@TestPropertySource` and pin `support.TestClockConfig`'s `MutableClock`.
+  `support.PostgresIntegrationTest` activates the `test` profile (without it
+  the verified-TLS startup check stops every context), caps each context's
+  pool at 3 connections, and sets the rate limits very high so tests don't
+  trip them. Tests that need a reachable limit (a `429`) extend
+  `support.SmallRateLimitsIntegrationTest`; its subclasses share one context,
+  so don't add configuration to them.
   `support.SchemaOwner` changes rows the app role can't write (e.g. partner
   status); it commits outside the test transaction, so undo it in `@AfterEach`.
 - If port 5432 is taken, set `POSTGRES_PORT` in `.env`; Compose and the `local`

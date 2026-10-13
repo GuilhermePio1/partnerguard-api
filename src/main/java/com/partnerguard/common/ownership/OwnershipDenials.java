@@ -1,6 +1,7 @@
 package com.partnerguard.common.ownership;
 
 import com.partnerguard.common.error.ResourceNotFoundException;
+import com.partnerguard.common.security.LogValues;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -25,7 +26,8 @@ public final class OwnershipDenials {
         if (scope instanceof OwnershipScope.PartnerOnly(var partnerId)) {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             log.warn("event=ownership_denied sub={} partnerId={} resourceType={} resourceId={}",
-                    authentication == null ? "" : authentication.getName(), partnerId, resourceType, resourceId);
+                    LogValues.loggable(authentication == null ? null : authentication.getName()), partnerId,
+                    resourceType, resourceId);
         }
         return new ResourceNotFoundException();
     }

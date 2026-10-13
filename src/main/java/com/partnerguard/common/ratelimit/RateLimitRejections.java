@@ -46,7 +46,7 @@ public class RateLimitRejections {
     void reject(RateLimit limit, String key, RateLimitDecision decision,
                 HttpServletRequest request, HttpServletResponse response) throws IOException {
         if (recentlyLogged.asMap().putIfAbsent(limit.keyType() + ":" + key, Boolean.TRUE) == null) {
-            log.warn("event=rate_limited limit={} key_type={} key={} method={} path={}",
+            log.warn("event=rate_limited limit={} keyType={} key={} method={} path={}",
                     limit.name().toLowerCase(Locale.ROOT), limit.keyType(), LogValues.loggable(key),
                     request.getMethod(), LogValues.loggable(request.getRequestURI()));
         }

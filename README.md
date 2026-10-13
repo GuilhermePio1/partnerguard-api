@@ -9,19 +9,17 @@ authentication, role-based and ownership-based authorization, rate limiting,
 and defenses against the most common OWASP risks. Every security decision is
 written down, specified and tested.
 
-> **Status:** milestone 5 (rate limiting) is done. Every endpoint in the
+> **Status:** milestone 6 (OWASP hardening) is done. Every endpoint in the
 > contract works against PostgreSQL with the seed fixtures, errors are Problem
 > Details, and the runtime API docs match the contract. Every request except
 > `/actuator/health` (plus Swagger in the `local` profile) needs a valid
 > Keycloak access token, and roles, ownership and field permissions are
 > enforced. Requests are rate limited per IP and per user (`429` with
-> `Retry-After`). `scripts/smoke-test.*` and `scripts/rate-limit-check.*` pass
-> against the local stack.
->
-> **Until milestone 6 lands, these accepted decisions are not in force yet,
-> so run it locally only:**
-> - No audit log (ADR-0012); only Spring Security's default security headers.
-
+> `Retry-After`). Every write leaves an audit row, every response carries the
+> security headers and an `X-Correlation-Id`, and outside the `local` profile
+> the app refuses to start without verified TLS to the database.
+> `scripts/smoke-test.*` and `scripts/rate-limit-check.*` pass against the local
+> stack. Milestone 7 adds the CI security scans and finishes the docs.
 >
 > The original brief is
 > [`partnerguard-api.md`](partnerguard-api.md). This README supersedes it where
@@ -266,14 +264,14 @@ All list endpoints are paginated (`page` from 0, `size` 1–100, default 20;
 | Risk | Mitigation | Decision |
 |---|---|---|
 | Broken access control | Role checks plus ownership checks; deny by default; `404` for other partners' resources; field-level permissions on claim updates; owner id only from the token | ADR-0003, 0004, 0005, 0009 |
-| Injection (SQL) | Only parameterized queries (Spring Data, JPQL named parameters, Criteria); no string concatenation; sort allow-list; static check in CI | ADR-0013 |
+| Injection (SQL) | Only parameterized queries (Spring Data, JPQL named parameters, Criteria); no string concatenation; sort allow-list; an ArchUnit rule bans every API that takes a query string at runtime | ADR-0013 |
 | Injection (XSS) | Free text is plain text only (`<`, `>` and control characters rejected); JSON responses only; `nosniff`; restrictive CSP | ADR-0013 |
 | Mass assignment | Unknown JSON properties rejected (`400`); request schemas never contain owner ids or status where not allowed | ADR-0003, 0009 |
 | Cryptographic failures / sensitive data | `taxId` validated as CNPJ (numeric or alphanumeric) and masked as `**.***.***/****-NN` in every response and log; TLS expected in front of the API in production; database connections require `sslmode=verify-full` outside `local`/`test`, and the app refuses to start without it | ADR-0010, 0018 |
 | Security misconfiguration | CSP `default-src 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Cache-Control: no-store`; stack traces never returned; actuator limited to `health` without details; CORS disabled | ADR-0005, 0008 |
 | Identification and authentication failures | Delegated to Keycloak; short-lived tokens; full JWT validation; RS256 only | ADR-0002 |
-| Vulnerable components | OWASP Dependency-Check in CI, failing on CVSS ≥ 7 | — |
-| Security logging failures | Audit log row for every write (same transaction, append-only table); structured security events for `401`, `403`, ownership `404` and `429` | ADR-0012 |
+| Vulnerable components | OWASP Dependency-Check in CI, failing on CVSS ≥ 7 (milestone 7); CVE overrides of Boot-managed versions in the meantime | — |
+| Security logging failures | Audit log row for every write (same transaction, append-only table, field names only); structured security events for `401`, `403`, ownership `404` and `429`; a server-generated correlation id on every response and log line | ADR-0012, 0023 |
 | Enumeration | Random UUIDs; identical `404` for missing and foreign resources | ADR-0004, 0014 |
 
 ### 8.5 Error handling ([ADR-0008](docs/adr/0008-problem-details-for-all-errors.md))
@@ -283,7 +281,29 @@ filters, follow RFC 7807 Problem Details (`application/problem+json`). Error
 responses never include stack traces, SQL messages, constraint names or
 internal class names. The error type catalog is in
 [`specs/errors.md`](specs/errors.md). Every response carries an
-`X-Correlation-Id` that links it to the server log.
+`X-Correlation-Id` that links it to the server log: the server generates it for
+each request, puts it in every log line of that request and ignores any value
+the client sends ([ADR-0023](docs/adr/0023-audit-details-and-server-generated-correlation-ids.md)).
+A `500` is logged as `event=unhandled_exception` with that id and the full
+exception; the client only sees the fixed message.
+
+### 8.6 Audit log and security events ([ADR-0012](docs/adr/0012-audit-log-in-same-transaction.md), [ADR-0023](docs/adr/0023-audit-details-and-server-generated-correlation-ids.md))
+
+- Every successful write (`PARTNER_CREATED`, `CLAIM_UPDATED`) inserts one row
+  in `audit_log`, in the same transaction as the change: if the audit insert
+  fails, the change is rolled back. The audit service only runs inside an
+  existing transaction, so a write that forgets `@Transactional` fails instead
+  of auditing on the side.
+- A row holds the caller's `sub`, the action, `<type>:<id>`, a UTC timestamp
+  and the **names** of the fields the request set (`{"fields":["status"]}`),
+  never their values, tokens or tax ids.
+- The application's database role can only `SELECT` and `INSERT` on
+  `audit_log`; there is no endpoint to read it.
+- Failed attempts are not audit rows (a flood would fill the table). They are
+  WARN log events: `authentication_failed`, `access_denied`,
+  `ownership_denied` and `rate_limited`, with the fields listed in
+  [`specs/audit.md`](specs/audit.md), client-supplied values sanitized, and
+  never an `Authorization` header or token.
 
 ## 9. Project structure
 
@@ -343,6 +363,12 @@ scripts/env-up.sh            # or: docker compose up -d
 ```
 
 On Windows PowerShell: `.\scripts\env-up.ps1` and `.\mvnw.cmd spring-boot:run`.
+
+`spring-boot:run` activates the `local` profile. A packaged jar started without
+a profile refuses to start, because outside `local` and `test` the database URL
+must use verified TLS (`sslmode=verify-full` plus `sslrootcert`,
+[ADR-0018](docs/adr/0018-verified-tls-for-database-connections.md)). Locally,
+run it with `java -jar target/partnerguard-api-0.1.0-SNAPSHOT.jar --spring.profiles.active=local`.
 
 Check it with `curl http://localhost:8080/actuator/health` (`{"status":"UP"}`).
 
@@ -428,8 +454,8 @@ runs. Surefire reports are uploaded when a run fails.
 | 3 ✅ | Authentication | Keycloak realm configured; API accepts only valid JWTs (`AUTHN-*`) |
 | 4 ✅ | Authorization | Role, ownership and field checks with full test coverage (`AUTHZ-*`, `CLM-*`) |
 | 5 ✅ | Rate limiting | Two-layer Bucket4j limits, with tests (`RL-*`) |
-| 6 | OWASP hardening | Validation, masking, headers, error handling and audit log (`HRD-*`, `ERR-*`, `AUD-*`) |
-| 7 | CI and docs | Pipeline green, Swagger complete, README finished, smoke tests pass |
+| 6 ✅ | OWASP hardening | Validation, masking, headers, error handling and audit log (`HRD-*`, `ERR-*`, `AUD-*`) |
+| 7 | CI and docs | Pipeline green with secret scanning and dependency checks (`HRD-10`, `HRD-11`), contract lint (`DOC-03`), Swagger complete, README finished, smoke tests pass |
 
 ## 14. Definition of done
 

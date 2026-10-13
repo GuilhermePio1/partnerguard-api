@@ -71,6 +71,15 @@ class ApplicationStartupTests extends PostgresIntegrationTest {
     }
 
     @Test
+    @DisplayName("AUD-04 the application role can't update or delete audit rows")
+    void auditLogIsAppendOnly() {
+        assertThatThrownBy(() -> jdbcTemplate.update("update audit_log set user_id = 'someone-else'"))
+                .rootCause().hasMessageContaining("permission denied for table audit_log");
+        assertThatThrownBy(() -> jdbcTemplate.update("delete from audit_log"))
+                .rootCause().hasMessageContaining("permission denied for table audit_log");
+    }
+
+    @Test
     @DisplayName("AUTHZ-14 health is UP and shows no details")
     void healthIsUpWithoutDetails() {
         assertThat(mvc.get().uri("/actuator/health"))

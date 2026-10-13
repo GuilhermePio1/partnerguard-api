@@ -1,38 +1,20 @@
 package com.partnerguard.security;
 
-import com.partnerguard.support.MutableClock;
-import com.partnerguard.support.PostgresIntegrationTest;
 import com.partnerguard.support.SecurityTestTokens;
-import com.partnerguard.support.TestClockConfig;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import com.partnerguard.support.SmallRateLimitsIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.security.oauth2.jwt.BadJwtException;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.partnerguard.support.Fixtures.CLAIM_A1;
 import static com.partnerguard.support.ProblemAssertions.assertProblem;
@@ -41,63 +23,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * specs/rate-limiting.md through the full filter chain, with small limits (ADR-0006, ADR-0022).
  *
- * <p>Valid callers come from {@link SecurityTestTokens} (already-validated JWTs). Forged
- * tokens go through a stub {@link JwtDecoder} that rejects every token, as a real decoder
- * rejects a bad signature, so they never become an authentication.
- *
- * <p>Each test starts two minutes after the previous one on a pinned clock, so every bucket
- * is full again and the once-a-minute log filter is clear. Each test also uses its own client
- * IP, so the IP ceiling of one test never leaks into another.
+ * <p>Forged tokens (well-formed JWTs nobody signed) go through the base class's rejecting
+ * decoder, so they never become an authentication.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@Import(TestClockConfig.class)
-@ExtendWith(OutputCaptureExtension.class)
-@Transactional
-@TestPropertySource(properties = {
-        "partnerguard.rate-limit.ip-ceiling-per-minute=" + RateLimitTests.IP_CEILING,
-        "partnerguard.rate-limit.user-per-minute=" + RateLimitTests.USER,
-        "partnerguard.rate-limit.user-writes-per-minute=" + RateLimitTests.USER_WRITES,
-        "partnerguard.rate-limit.anonymous-per-minute=" + RateLimitTests.ANONYMOUS
-})
-class RateLimitTests extends PostgresIntegrationTest {
-
-    static final int IP_CEILING = 10;
-    static final int USER = 3;
-    static final int USER_WRITES = 2;
-    static final int ANONYMOUS = 3;
+class RateLimitTests extends SmallRateLimitsIntegrationTest {
 
     private static final String CLAIMS = "/api/v1/claims";
     private static final String HEALTH = "/actuator/health";
-
-    /** Test n runs on a clock pinned 2n minutes after START. */
-    private static final Instant START = Instant.now();
-    private static final AtomicInteger TESTS_RUN = new AtomicInteger();
-
-    @Autowired
-    MockMvcTester mvc;
-
-    @Autowired
-    MutableClock clock;
-
-    @MockitoBean
-    JwtDecoder jwtDecoder;
-
-    @BeforeEach
-    void freshBuckets() {
-        clock.pin(START.plus(Duration.ofMinutes(2L * TESTS_RUN.incrementAndGet())));
-        when(jwtDecoder.decode(anyString())).thenThrow(new BadJwtException("Signed JWT rejected: Invalid signature"));
-    }
-
-    @AfterEach
-    void resetClock() {
-        clock.reset();
-    }
 
     @Test
     @DisplayName("RL-01 user-per-minute + 1 GETs by one user: the last one is 429 with Retry-After and Problem Details")
@@ -179,7 +115,7 @@ class RateLimitTests extends PostgresIntegrationTest {
         exhaustAndHitTwice(ip);
         assertThat(rateLimitedEvents(output)).hasSize(1);
         assertThat(rateLimitedEvents(output).getFirst())
-                .contains("key_type=sub")
+                .contains("keyType=sub")
                 .contains("key=" + SecurityTestTokens.PARTNER_SUBJECT)
                 .contains("path=" + CLAIMS);
 
@@ -248,12 +184,5 @@ class RateLimitTests extends PostgresIntegrationTest {
         String payload = encoder.encodeToString(("{\"sub\":\"" + subject + "\",\"aud\":\"partnerguard-api\"}")
                 .getBytes(StandardCharsets.UTF_8));
         return header + "." + payload + "." + encoder.encodeToString("forged".getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static RequestPostProcessor from(String ip) {
-        return request -> {
-            request.setRemoteAddr(ip);
-            return request;
-        };
     }
 }
