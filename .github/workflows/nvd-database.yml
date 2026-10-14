@@ -1,0 +1,76 @@
+# Keeps the OWASP Dependency-Check vulnerability database (NVD and the other built-in sources)
+# in the Actions cache, so the dependency check in ci.yml (HRD-11) only downloads a daily delta.
+# This workflow is the only writer of that cache. Run it by hand once to fill an empty cache:
+# the first download of the whole NVD can take hours when the NVD API is slow.
+name: NVD database
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+# Least privilege for the workflow token: the job only reads the repository.
+permissions:
+  contents: read
+
+# Its own group, never cancelled: a push to main must not kill a download that is hours in.
+concurrency:
+  group: nvd-database
+  cancel-in-progress: false
+
+# Actions are pinned to full commit SHAs, so a moved tag can't change what runs.
+jobs:
+  update:
+    name: Update the vulnerability database
+    runs-on: ubuntu-24.04
+    # GitHub-hosted runners stop jobs at 6 hours.
+    timeout-minutes: 350
+    env:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+    steps:
+      # Fail closed: without the key the NVD throttles the download until it never finishes.
+      - name: Require the NVD API key
+        run: |
+          if [ -z "$NVD_API_KEY" ]; then
+            echo "::error::The NVD_API_KEY repository secret is missing (specs/hardening.md rule 12)."
+            exit 1
+          fi
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Compute the database cache key
+        id: key
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      # Starts from the newest database, so a day's run only fetches what changed since then.
+      - name: Restore the vulnerability database
+        id: restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.dependency-check-data
+          key: dependency-check-data-${{ steps.key.outputs.day }}
+          restore-keys: dependency-check-data-
+
+      # Fails on any NVD error. Dependency-Check only records the update as done when it completes,
+      # so a partial download is never saved below as if it were complete.
+      - name: Update the database
+        run: ./mvnw -B -ntp dependency-check:update-only
+
+      # Only after a successful update; a cache entry can't be replaced, so skip an exact hit.
+      - name: Save the vulnerability database
+        if: steps.restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.dependency-check-data
+          key: dependency-check-data-${{ steps.key.outputs.day }}

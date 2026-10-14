@@ -8,7 +8,8 @@ nice-to-have.
 
 Status: all seven milestones done (`README.md` §13). CI runs four jobs: build
 and test, contract lint (DOC-03), gitleaks (HRD-10) and OWASP Dependency-Check
-(HRD-11, needs the `NVD_API_KEY` repo secret). New work starts from the open
+(HRD-11, needs the `NVD_API_KEY` repo secret and the NVD database cached by
+the `nvd-database.yml` workflow). New work starts from the open
 questions in `specs/` (listed in `README.md` §15).
 
 Controllers get scope, role and partner id **only** from `CallerContext`

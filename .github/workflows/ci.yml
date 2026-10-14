@@ -100,9 +100,8 @@ jobs:
   dependency-check:
     name: Dependency check (HRD-11)
     runs-on: ubuntu-24.04
-    # The first run downloads the whole NVD database (about 45 minutes with the NVD's retries);
-    # later runs start from the cache and take a few minutes.
-    timeout-minutes: 90
+    # Starts from the database cached by nvd-database.yml and only downloads what changed since.
+    timeout-minutes: 45
     env:
       NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
 
@@ -127,18 +126,26 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # The vulnerability database is large; keep it between runs and refresh it daily, so a
-      # run only downloads what changed since the last one.
+      # The workflow nvd-database.yml refreshes this database daily and is the only one that saves
+      # it: a full NVD download can take hours and doesn't fit here, nor survive a newer push.
       - name: Compute the database cache key
         id: nvd-cache
         run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - name: Restore the vulnerability database
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: nvd-restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.dependency-check-data
           key: dependency-check-data-${{ steps.nvd-cache.outputs.day }}
           restore-keys: dependency-check-data-
+
+      # Fail closed and fast instead of starting a full download that can't finish in time.
+      - name: Require the cached database
+        if: steps.nvd-restore.outputs.cache-matched-key == ''
+        run: |
+          echo "::error::No cached vulnerability database. Run the 'NVD database' workflow (Actions tab), then re-run this job."
+          exit 1
 
       # Fails on any dependency with CVSS >= 7 (failBuildOnCVSS in pom.xml).
       - name: Run OWASP Dependency-Check
