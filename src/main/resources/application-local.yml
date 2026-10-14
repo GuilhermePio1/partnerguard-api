@@ -10,9 +10,16 @@ spring:
     password: ${POSTGRES_PASSWORD:partnerguard-local}
     # Seed data (specs/fixtures.md) is loaded only in this profile (ADR-0015).
     locations: classpath:db/migration,classpath:db/seed
+  web:
+    resources:
+      # Serves contracts/openapi.yaml at /openapi.yaml for Swagger UI (ADR-0024). Read from the
+      # repository at runtime, never packaged; spring-boot:run starts in the repository root.
+      static-locations: classpath:/static/,file:contracts/
 
 springdoc:
   api-docs:
     enabled: true
   swagger-ui:
     enabled: true
+    # Swagger UI renders the contract itself; /v3/api-docs stays generated, for DOC-01 (ADR-0024).
+    url: /openapi.yaml

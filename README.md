@@ -9,7 +9,7 @@ authentication, role-based and ownership-based authorization, rate limiting,
 and defenses against the most common OWASP risks. Every security decision is
 written down, specified and tested.
 
-> **Status:** milestone 6 (OWASP hardening) is done. Every endpoint in the
+> **Status:** all seven milestones are done. Every endpoint in the
 > contract works against PostgreSQL with the seed fixtures, errors are Problem
 > Details, and the runtime API docs match the contract. Every request except
 > `/actuator/health` (plus Swagger in the `local` profile) needs a valid
@@ -19,7 +19,9 @@ written down, specified and tested.
 > security headers and an `X-Correlation-Id`, and outside the `local` profile
 > the app refuses to start without verified TLS to the database.
 > `scripts/smoke-test.*` and `scripts/rate-limit-check.*` pass against the local
-> stack. Milestone 7 adds the CI security scans and finishes the docs.
+> stack, and CI also lints the contract, scans the history for secrets and
+> checks dependencies for known vulnerabilities. Run it locally only: deployment
+> is out of scope (see [Goals](#2-goals)).
 >
 > The original brief is
 > [`partnerguard-api.md`](partnerguard-api.md). This README supersedes it where
@@ -73,9 +75,9 @@ policies and claims ([ADR-0017](docs/adr/0017-add-get-claim-by-id.md)).
 | Rate limiting | Bucket4j core + Caffeine ([ADR-0006](docs/adr/0006-two-layer-rate-limiting.md)) |
 | Validation | Jakarta Bean Validation |
 | API contract | OpenAPI 3.0.3, contract-first with openapi-generator 7.25 ([ADR-0007](docs/adr/0007-contract-first-openapi.md)) |
-| API docs | springdoc-openapi 3.x (Swagger UI, `local` profile) |
+| API docs | springdoc-openapi 3.x: Swagger UI renders the contract, `local` profile only ([ADR-0024](docs/adr/0024-swagger-ui-renders-the-contract.md)) |
 | Tests | JUnit 5, Mockito, Spring Security Test, Testcontainers, ArchUnit |
-| Build and CI | Maven, GitHub Actions, OWASP Dependency-Check, JaCoCo |
+| Build and CI | Maven, GitHub Actions, JaCoCo, Redocly CLI, gitleaks, OWASP Dependency-Check |
 | Runtime | Docker Compose |
 
 ## 4. Architecture
@@ -192,7 +194,10 @@ The full contract, with schemas and every status code, is
 
 All list endpoints are paginated (`page` from 0, `size` 1–100, default 20;
 `sort` from an allow-list). Interactive docs are at `/swagger-ui.html` in the
-`local` profile.
+`local` profile: Swagger UI renders `contracts/openapi.yaml` itself (served at
+`/openapi.yaml`), so it shows each operation's `x-required-roles`, and
+*Authorize* takes a token from `scripts/get-token.*`
+([ADR-0024](docs/adr/0024-swagger-ui-renders-the-contract.md)).
 
 ## 8. Security design
 
@@ -270,7 +275,7 @@ All list endpoints are paginated (`page` from 0, `size` 1–100, default 20;
 | Cryptographic failures / sensitive data | `taxId` validated as CNPJ (numeric or alphanumeric) and masked as `**.***.***/****-NN` in every response and log; TLS expected in front of the API in production; database connections require `sslmode=verify-full` outside `local`/`test`, and the app refuses to start without it | ADR-0010, 0018 |
 | Security misconfiguration | CSP `default-src 'none'`, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Cache-Control: no-store`; stack traces never returned; actuator limited to `health` without details; CORS disabled | ADR-0005, 0008 |
 | Identification and authentication failures | Delegated to Keycloak; short-lived tokens; full JWT validation; RS256 only | ADR-0002 |
-| Vulnerable components | OWASP Dependency-Check in CI, failing on CVSS ≥ 7 (milestone 7); CVE overrides of Boot-managed versions in the meantime | — |
+| Vulnerable components | OWASP Dependency-Check in CI, failing on CVSS ≥ 7; documented overrides of Boot-managed versions until Boot ships the fix | — |
 | Security logging failures | Audit log row for every write (same transaction, append-only table, field names only); structured security events for `401`, `403`, ownership `404` and `429`; a server-generated correlation id on every response and log line | ADR-0012, 0023 |
 | Enumeration | Random UUIDs; identical `404` for missing and foreign resources | ADR-0004, 0014 |
 
@@ -333,11 +338,14 @@ partnerguard-api/
 ├── src/test/java/...         # Unit, slice, integration and architecture tests
 ├── docker/postgres/init/      # Creates the non-owner application role
 ├── keycloak/
-│   └── realm-export.json      # (milestone 3)
+│   └── realm-export.json      # Local realm: clients, roles, test users
 ├── docker-compose.yml
 ├── .env.example               # Local overrides template (copy to .env)
 ├── pom.xml, mvnw, mvnw.cmd
-└── .github/workflows/ci.yml   # Build and tests (security scans in milestone 7)
+├── redocly.yaml               # Contract lint rules (DOC-03)
+├── .gitleaksignore            # Fingerprints of known non-secrets (HRD-10)
+├── LICENSE                    # MIT
+└── .github/workflows/ci.yml   # Build and test, contract lint, secret scan, dependency check
 ```
 
 The code is organized by feature, not by layer
@@ -419,7 +427,13 @@ scripts/rate-limit-check.sh    # 429 + Retry-After
 | Rate limit tests | Limits reached return `429` with `Retry-After`; forged `sub` can't dodge or drain buckets |
 | Injection tests | Script payloads rejected; SQL payloads stored verbatim with no effect |
 | Architecture tests | `@PreAuthorize` everywhere, no feature cycles, no cross-feature repository access |
-| Contract test | Runtime `/v3/api-docs` matches `contracts/openapi.yaml` |
+| Contract test | Runtime `/v3/api-docs` matches `contracts/openapi.yaml`; Swagger UI serves the contract unchanged |
+| Security event and header tests | One structured log line per `401`, `403`, ownership `404` and `429`; security headers and `X-Correlation-Id` on every response; the error catalog end to end |
+| Startup check tests | No verified database TLS outside `local`/`test` stops the application, without echoing credentials |
+
+Every `./mvnw verify` also writes a JaCoCo coverage report to `target/site/jacoco`
+(generated contract code excluded). There is no coverage threshold: the bar is
+that every spec criterion has a test.
 
 The security tests are the core of the project
 ([ADR-0016](docs/adr/0016-security-test-matrix.md)). Every rule in sections 6
@@ -432,18 +446,24 @@ starts with its criterion ID (e.g. `CLM-12`).
 On every push to `main` and every pull request, GitHub Actions
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs:
 
-| # | Step | Status |
+| Job | What it does | Criterion |
 |---|---|---|
-| 1 | Build: code generated from the contract, compilation | ✅ running |
-| 2 | Unit, integration (Testcontainers PostgreSQL) and architecture tests (`./mvnw verify`) | ✅ running |
-| 3 | Contract lint (`redocly lint contracts/openapi.yaml`) | Milestone 7 |
-| 4 | OWASP Dependency-Check (fails on CVSS ≥ 7) and secret scanning | Milestone 7 |
-| 5 | Test coverage report (JaCoCo) | Milestone 7 |
+| Build and test | Generates code from the contract, compiles, runs every test (`./mvnw verify`, Testcontainers PostgreSQL and Keycloak) and uploads the JaCoCo coverage report | all test criteria |
+| Contract lint | `redocly lint contracts/openapi.yaml` with the recommended rules; exceptions and reasons in [`redocly.yaml`](redocly.yaml) | DOC-03 |
+| Secret scan | gitleaks over the whole git history; known non-secrets listed in [`.gitleaksignore`](.gitleaksignore) | HRD-10 |
+| Dependency check | OWASP Dependency-Check (`./mvnw dependency-check:check`), fails on CVSS ≥ 7, report uploaded as an artifact | HRD-11 |
+
+The four jobs run in parallel. The dependency check needs a free
+[NVD API key](https://nvd.nist.gov/developers/request-an-api-key) in the
+repository secret `NVD_API_KEY`; without it the job fails on purpose rather than
+running unchecked. A fork must add its own. The vulnerability database is
+cached between runs and refreshed daily.
 
 The workflow is hardened like the API: the token is read-only
 (`permissions: contents: read`), checkout doesn't persist credentials, and
-every action is pinned to a full commit SHA, so a moved tag can't change what
-runs. Surefire reports are uploaded when a run fails.
+every action is pinned to a full commit SHA and every container image to a
+digest, so a moved tag can't change what runs. Surefire reports are uploaded
+when a run fails.
 
 ## 13. Milestones
 
@@ -455,7 +475,7 @@ runs. Surefire reports are uploaded when a run fails.
 | 4 ✅ | Authorization | Role, ownership and field checks with full test coverage (`AUTHZ-*`, `CLM-*`) |
 | 5 ✅ | Rate limiting | Two-layer Bucket4j limits, with tests (`RL-*`) |
 | 6 ✅ | OWASP hardening | Validation, masking, headers, error handling and audit log (`HRD-*`, `ERR-*`, `AUD-*`) |
-| 7 | CI and docs | Pipeline green with secret scanning and dependency checks (`HRD-10`, `HRD-11`), contract lint (`DOC-03`), Swagger complete, README finished, smoke tests pass |
+| 7 ✅ | CI and docs | Pipeline green with secret scanning and dependency checks (`HRD-10`, `HRD-11`), contract lint (`DOC-03`), Swagger complete, README finished, smoke tests pass |
 
 ## 14. Definition of done
 
@@ -480,7 +500,10 @@ These are not decided yet and are not implemented. Each is tracked in its spec:
 
 - An endpoint to change a partner's status ([partners](specs/partners.md#open-questions)).
 - Masking of `holderName`/`vehiclePlate` under LGPD ([policies](specs/policies.md#open-questions)).
-- ADMIN edits on final-state claims; optimistic locking ([claims](specs/claims.md#open-questions)).
+- ADMIN edits on final-state claims; optimistic locking ([claims](specs/claims.md#open-questions), [api-conventions](specs/api-conventions.md#open-questions)).
+- A retention period for audit rows and logs ([audit](specs/audit.md#open-questions)).
+- Encrypting `taxId` at rest ([hardening](specs/hardening.md#open-questions)).
+- `RateLimit-*` headers with the remaining quota ([rate limiting](specs/rate-limiting.md#open-questions)).
 
 ## What this project demonstrates
 

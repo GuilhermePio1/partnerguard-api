@@ -29,3 +29,4 @@ creates one and updates this index.
 | [0021](0021-reject-mixed-roles-and-block-suspended-partners.md) | Reject tokens that mix `PARTNER` with an internal role, and block suspended or unknown partners | Accepted |
 | [0022](0022-rate-limit-anonymous-bucket-and-refusals.md) | Count every unauthenticated request in the anonymous bucket, and let refusals take no tokens | Accepted |
 | [0023](0023-audit-details-and-server-generated-correlation-ids.md) | Audit the field names a request set, and generate correlation ids on the server | Accepted |
+| [0024](0024-swagger-ui-renders-the-contract.md) | Swagger UI renders the contract, not the generated docs | Accepted |

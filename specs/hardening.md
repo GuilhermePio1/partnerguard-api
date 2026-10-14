@@ -53,7 +53,11 @@ No `Server` or `X-Powered-By` version banners.
     `docker-compose.yml`, `.env.example` and `application-local.yml`, clearly
     marked local-only. `application.yml` has no password defaults.
 11. CORS is disabled (no browser frontend in scope).
-12. CI runs OWASP Dependency-Check and fails on CVSS ≥ 7.
+12. CI runs OWASP Dependency-Check (`./mvnw dependency-check:check`) and fails
+    on CVSS ≥ 7. The NVD API key comes from the repository secret
+    `NVD_API_KEY`, never from a file; without it the job fails instead of
+    running unchecked. A false positive is suppressed only in
+    `dependency-check-suppressions.xml`, with the reason next to it.
 
 ### Database connections ([ADR-0018](../docs/adr/0018-verified-tls-for-database-connections.md))
 
@@ -76,6 +80,12 @@ Example (non-local):
 ```
 jdbc:postgresql://db.internal:5432/partnerguard?sslmode=verify-full&sslrootcert=/etc/partnerguard/pg-ca.crt
 ```
+
+### Secret scanning
+
+16. CI scans the whole git history for secrets with gitleaks; a finding fails
+    the build. A value that only looks like a secret (a fake token in a test)
+    is listed by fingerprint in `.gitleaksignore`, with the reason next to it.
 
 ## Acceptance criteria
 

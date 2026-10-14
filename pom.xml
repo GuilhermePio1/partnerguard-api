@@ -23,6 +23,8 @@
         <springdoc.version>3.1.1</springdoc.version>
         <archunit.version>1.5.1</archunit.version>
         <bucket4j.version>8.20.0</bucket4j.version>
+        <jacoco.version>0.8.15</jacoco.version>
+        <dependency-check.version>13.0.0</dependency-check.version>
 
         <!--
           Security overrides of versions managed by Spring Boot. Remove each one as soon as
@@ -198,6 +200,57 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+
+            <!-- Coverage report (target/site/jacoco) on every verify. Report only: no threshold is specified. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <!-- Generated from the contract; covering it says nothing about our code. -->
+                    <excludes>
+                        <exclude>com/partnerguard/api/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!--
+              OWASP Dependency-Check (specs/hardening.md rule 12, HRD-11). Not bound to a phase: CI runs
+              ./mvnw dependency-check:check in its own job. The NVD API key comes from the NVD_API_KEY
+              environment variable (a GitHub secret in CI), never from this file.
+            -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>${dependency-check.version}</version>
+                <configuration>
+                    <failBuildOnCVSS>7</failBuildOnCVSS>
+                    <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+                    <!-- Outside ~/.m2, so CI can cache it on its own schedule (refreshed daily). -->
+                    <dataDirectory>${user.home}/.dependency-check-data</dataDirectory>
+                    <formats>
+                        <format>HTML</format>
+                        <format>JSON</format>
+                    </formats>
+                    <!-- Sonatype OSS Index now needs an account; NVD (plus the other built-in sources) is the source of record. -->
+                    <ossindexAnalyzerEnabled>false</ossindexAnalyzerEnabled>
+                </configuration>
             </plugin>
         </plugins>
     </build>

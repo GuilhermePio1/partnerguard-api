@@ -107,7 +107,9 @@ class SecurityConfig {
                     requests.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll();
                     // API docs are enabled only in the local profile (ADR-0005, DOC-02).
                     if (apiDocsEnabled) {
-                        requests.requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll();
+                        // /openapi.yaml is the contract itself, which Swagger UI renders (ADR-0024).
+                        requests.requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**", "/openapi.yaml")
+                                .permitAll();
                     }
                     requests.requestMatchers("/api/**").access(apiCallers);
                     requests.anyRequest().access(new DenyByDefault());

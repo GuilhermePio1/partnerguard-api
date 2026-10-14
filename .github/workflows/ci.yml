@@ -1,5 +1,5 @@
-# Build and test on every push to main and every pull request.
-# Milestone 7 adds contract lint, OWASP Dependency-Check, secret scanning and coverage.
+# On every push to main and every pull request: build and test, contract lint, secret scan and
+# dependency check, as four parallel jobs. Each job id names the spec criterion it covers.
 name: CI
 
 on:
@@ -7,7 +7,7 @@ on:
     branches: [main]
   pull_request:
 
-# Least privilege for the workflow token: the job only reads the repository.
+# Least privilege for the workflow token: every job only reads the repository.
 permissions:
   contents: read
 
@@ -16,6 +16,8 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Actions are pinned to full commit SHAs and container images to digests, so a moved tag
+# can't change what runs.
 jobs:
   build:
     name: Build and test
@@ -23,7 +25,6 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      # Actions are pinned to full commit SHAs, not tags, so a moved tag can't change what runs.
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -36,10 +37,19 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # Generates code from contracts/openapi.yaml, compiles and runs every test.
-      # Integration tests start PostgreSQL with Testcontainers on the runner's Docker.
+      # Generates code from contracts/openapi.yaml, compiles, runs every test and writes the
+      # JaCoCo coverage report. Integration tests start PostgreSQL with Testcontainers on the
+      # runner's Docker.
       - name: Build and test
         run: ./mvnw -B -ntp verify
+
+      - name: Upload coverage report
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: target/site/jacoco/
+          retention-days: 14
 
       - name: Upload test reports
         if: failure()
@@ -48,3 +58,97 @@ jobs:
           name: surefire-reports
           path: target/surefire-reports/
           retention-days: 7
+
+  contract-lint:
+    name: Contract lint (DOC-03)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Recommended rules, with the exceptions and their reasons in redocly.yaml. Errors fail the job.
+      - name: Lint contracts/openapi.yaml
+        run: >-
+          docker run --rm -v "$GITHUB_WORKSPACE:/spec"
+          redocly/cli:2.53.0@sha256:8d4e0276a392878d2d8616990cedf255511f0fc0785730084dafce57ee4349e6
+          lint contracts/openapi.yaml
+
+  secret-scan:
+    name: Secret scan (HRD-10)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      # The whole history, not only the last commit: a secret removed later is still leaked.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Fails on any finding. Values that only look like secrets are listed in .gitleaksignore.
+      - name: Scan the git history with gitleaks
+        run: >-
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --redact --verbose
+
+  dependency-check:
+    name: Dependency check (HRD-11)
+    runs-on: ubuntu-24.04
+    # The first run downloads the whole NVD database (about 45 minutes with the NVD's retries);
+    # later runs start from the cache and take a few minutes.
+    timeout-minutes: 90
+    env:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+    steps:
+      # Fail closed: without the key the NVD throttles the download until the check is useless.
+      - name: Require the NVD API key
+        run: |
+          if [ -z "$NVD_API_KEY" ]; then
+            echo "::error::The NVD_API_KEY repository secret is missing (specs/hardening.md rule 12)."
+            exit 1
+          fi
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # The vulnerability database is large; keep it between runs and refresh it daily, so a
+      # run only downloads what changed since the last one.
+      - name: Compute the database cache key
+        id: nvd-cache
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the vulnerability database
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.dependency-check-data
+          key: dependency-check-data-${{ steps.nvd-cache.outputs.day }}
+          restore-keys: dependency-check-data-
+
+      # Fails on any dependency with CVSS >= 7 (failBuildOnCVSS in pom.xml).
+      - name: Run OWASP Dependency-Check
+        run: ./mvnw -B -ntp dependency-check:check
+
+      - name: Upload the dependency-check report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dependency-check-report
+          path: target/dependency-check-report.*
+          retention-days: 14
+          if-no-files-found: ignore

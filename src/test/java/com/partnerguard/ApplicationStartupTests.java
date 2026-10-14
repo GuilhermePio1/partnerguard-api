@@ -97,6 +97,12 @@ class ApplicationStartupTests extends PostgresIntegrationTest {
     }
 
     @Test
+    @DisplayName("DOC-04 outside the local profile, /openapi.yaml is not served")
+    void contractHiddenOutsideLocalProfile() {
+        assertThat(mvc.get().uri("/openapi.yaml").exchange().getResponse().getStatus()).isIn(401, 404);
+    }
+
+    @Test
     @DisplayName("AUTHZ-15 actuator exposes nothing but health")
     void otherActuatorEndpointsAreNotExposed() {
         for (String endpoint : new String[] {"env", "beans", "heapdump", "configprops", "mappings"}) {

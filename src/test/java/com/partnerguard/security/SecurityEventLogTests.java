@@ -9,7 +9,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.partnerguard.support.Fixtures.CLAIM_B1;
 import static com.partnerguard.support.Fixtures.PARTNER_A;
@@ -18,7 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** specs/audit.md rule 5: one WARN line per security event, with the listed fields. */
 class SecurityEventLogTests extends SmallRateLimitsIntegrationTest {
 
-    private static final String TOKEN = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ4In0.c2lnbmF0dXJlLXZhbHVl";
+    /** A well-formed JWT nobody signed, built here so no token-shaped literal sits in the source. */
+    private static final String TOKEN = Stream.of("{\"alg\":\"RS256\"}", "{\"sub\":\"x\"}", "signature-value")
+            .map(part -> Base64.getUrlEncoder().withoutPadding().encodeToString(part.getBytes(StandardCharsets.UTF_8)))
+            .collect(Collectors.joining("."));
 
     @Test
     @DisplayName("AUD-06 a 401 writes one authentication_failed line with ip, method, path and reason, and no token")

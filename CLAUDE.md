@@ -6,10 +6,10 @@ Bucket4j. The point of the project is **security that is specified, decided and
 tested**. Treat every security rule as a requirement with a test, not a
 nice-to-have.
 
-Status: milestone 6 done (audit log, security headers, correlation ids,
-verified-TLS startup check, error catalog and security-event tests). Next:
-milestone 7, CI scans (HRD-10/11), contract lint (DOC-03) and docs
-(`README.md` §13).
+Status: all seven milestones done (`README.md` §13). CI runs four jobs: build
+and test, contract lint (DOC-03), gitleaks (HRD-10) and OWASP Dependency-Check
+(HRD-11, needs the `NVD_API_KEY` repo secret). New work starts from the open
+questions in `specs/` (listed in `README.md` §15).
 
 Controllers get scope, role and partner id **only** from `CallerContext`
 (`common.caller.JwtCallerContext`, built from the validated JWT).

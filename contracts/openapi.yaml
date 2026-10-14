@@ -40,6 +40,7 @@ info:
     name: PartnerGuard maintainers
   license:
     name: MIT
+    url: https://github.com/GuilhermePio1/partnerguard-api/blob/main/LICENSE
 
 servers:
   - url: http://localhost:8080

@@ -1,0 +1,11 @@
+# Contract lint (specs/api-conventions.md rule 10, DOC-03): Redocly's recommended rules.
+# A rule is turned off only here, with the reason next to it.
+extends:
+  - recommended
+
+rules:
+  # The only server is local development: deployment is out of scope (README §1).
+  no-server-example.com: off
+  # PlainText documents the free-text rule once; request schemas inline its pattern because
+  # the code generator mishandles allOf on primitives (ADR-0007).
+  no-unused-components: off

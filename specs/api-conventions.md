@@ -4,7 +4,8 @@
 
 Rules shared by every endpoint: media types, pagination, ids, validation,
 documentation and code structure. Related: [ADR-0007](../docs/adr/0007-contract-first-openapi.md),
-[ADR-0011](../docs/adr/0011-package-by-feature.md), [ADR-0014](../docs/adr/0014-uuid-identifiers.md).
+[ADR-0011](../docs/adr/0011-package-by-feature.md), [ADR-0014](../docs/adr/0014-uuid-identifiers.md),
+[ADR-0024](../docs/adr/0024-swagger-ui-renders-the-contract.md).
 
 ## Rules
 
@@ -28,6 +29,15 @@ documentation and code structure. Related: [ADR-0007](../docs/adr/0007-contract-
 9. The contract in `contracts/openapi.yaml` is the source of truth. Code that
    adds, removes or changes an operation, parameter, schema or status code
    without the same change in the contract is a defect.
+10. CI lints the contract with Redocly's recommended rules (`redocly.yaml`).
+    Errors fail the build. A rule is turned off only in `redocly.yaml`, with the
+    reason next to it.
+11. In the `local` profile, Swagger UI (`/swagger-ui.html`) renders the contract
+    itself, served unchanged at `/openapi.yaml`, so it shows everything the
+    contract documents: title, description, the bearer scheme behind
+    *Authorize*, and `x-required-roles`. `/v3/api-docs` stays generated from
+    the code, for the drift test (DOC-01). Outside `local`, neither is served
+    (ADR-0024).
 
 ## Acceptance criteria
 
@@ -43,6 +53,7 @@ documentation and code structure. Related: [ADR-0007](../docs/adr/0007-contract-
 | DOC-01 | Given the app running with the `local` profile, when comparing `/v3/api-docs` with `contracts/openapi.yaml`, then paths, methods and response codes match | Integration |
 | DOC-02 | Given the `local` profile, `/swagger-ui.html` is reachable without a token; given any other profile, it returns `401` or `404` | Integration |
 | DOC-03 | Given CI, `contracts/openapi.yaml` passes `redocly lint` with no errors | CI |
+| DOC-04 | Given the `local` profile, `/openapi.yaml` is reachable without a token and is byte-for-byte `contracts/openapi.yaml`, and Swagger UI's configuration points to it; given any other profile, `/openapi.yaml` returns `401` or `404` | Integration |
 | ARCH-01 | No dependency cycles between feature packages | Arch |
 | ARCH-02 | No class outside a feature package accesses that feature's repository | Arch |
 | ARCH-03 | `@RestController` classes don't depend on repositories | Arch |

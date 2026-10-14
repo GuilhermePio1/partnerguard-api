@@ -1,0 +1,7 @@
+# Findings gitleaks may ignore (specs/hardening.md rule 16). One fingerprint per line,
+# each with the reason above it. Only values that are provably not secrets belong here.
+
+# A fake JWT used in a test: header {"alg":"RS256"}, payload {"sub":"x"}, signature
+# "signature-value". Nobody issued or signed it. The test now builds it at runtime;
+# this is the copy left in the history.
+3427e039ddc31510e604cb04088e662b66c4f70b:src/test/java/com/partnerguard/security/SecurityEventLogTests.java:generic-api-key:21
