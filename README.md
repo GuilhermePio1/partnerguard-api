@@ -9,6 +9,15 @@ authentication, role-based and ownership-based authorization, rate limiting,
 and defenses against the most common OWASP risks. Every security decision is
 written down, specified and tested.
 
+## What to look at in 5 minutes
+
+| File | What it shows |
+|---|---|
+| [`SecurityConfig`](src/main/java/com/partnerguard/config/SecurityConfig.java) | Stateless JWT resource server that denies by default: RS256 only, a clock-aware expiry check, Problem Details for `401`/`403`, and the two rate-limit filters placed around token validation |
+| [`ClaimService`](src/main/java/com/partnerguard/claim/ClaimService.java) | Ownership enforced in the query itself (`findByIdAndPartnerId`), so another partner's claim is a `404`, never a `403`. PATCH checks run in a fixed order (`400` → `403` → `404` → `409`) and each change writes an audit row in the same transaction |
+| [`SecurityMatrixTests`](src/test/java/com/partnerguard/security/SecurityMatrixTests.java) | Every operation in the contract called by every kind of caller. The expected status comes from the contract's `x-required-roles`, so the code and the contract can't drift apart |
+| [ADR-0006](docs/adr/0006-two-layer-rate-limiting.md) | Why the brief's rate limit, keyed on the `sub` of a token not yet validated, could be bypassed or used to lock out another user, and the two-layer design that replaced it |
+
 > **Status:** all seven milestones are done. Every endpoint in the
 > contract works against PostgreSQL with the seed fixtures, errors are Problem
 > Details, and the runtime API docs match the contract. Every request except
