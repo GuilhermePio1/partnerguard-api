@@ -30,3 +30,4 @@ creates one and updates this index.
 | [0022](0022-rate-limit-anonymous-bucket-and-refusals.md) | Count every unauthenticated request in the anonymous bucket, and let refusals take no tokens | Accepted |
 | [0023](0023-audit-details-and-server-generated-correlation-ids.md) | Audit the field names a request set, and generate correlation ids on the server | Accepted |
 | [0024](0024-swagger-ui-renders-the-contract.md) | Swagger UI renders the contract, not the generated docs | Accepted |
+| [0025](0025-read-nvd-data-from-the-nist-data-feeds.md) | Read NVD data from the NIST data feeds, not the NVD API | Accepted |

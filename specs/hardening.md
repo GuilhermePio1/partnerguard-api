@@ -7,7 +7,8 @@ configuration. Related:
 [ADR-0010](../docs/adr/0010-cnpj-validation-and-masking.md),
 [ADR-0013](../docs/adr/0013-plain-text-input-and-xss.md),
 [ADR-0005](../docs/adr/0005-deny-by-default.md),
-[ADR-0018](../docs/adr/0018-verified-tls-for-database-connections.md).
+[ADR-0018](../docs/adr/0018-verified-tls-for-database-connections.md),
+[ADR-0025](../docs/adr/0025-read-nvd-data-from-the-nist-data-feeds.md).
 
 ## Rules
 
@@ -54,9 +55,11 @@ No `Server` or `X-Powered-By` version banners.
     marked local-only. `application.yml` has no password defaults.
 11. CORS is disabled (no browser frontend in scope).
 12. CI runs OWASP Dependency-Check (`./mvnw dependency-check:check`) and fails
-    on CVSS ≥ 7. The NVD API key comes from the repository secret
-    `NVD_API_KEY`, never from a file; without it the job fails instead of
-    running unchecked. A false positive is suppressed only in
+    on CVSS ≥ 7. Its NVD data comes from the official NIST JSON 2.0 data
+    feeds, cached in CI and refreshed daily
+    ([ADR-0025](../docs/adr/0025-read-nvd-data-from-the-nist-data-feeds.md));
+    without a cached database the job fails instead of running unchecked,
+    and so does any error while updating it. A false positive is suppressed only in
     `dependency-check-suppressions.xml`, with the reason next to it.
 
 ### Database connections ([ADR-0018](../docs/adr/0018-verified-tls-for-database-connections.md))

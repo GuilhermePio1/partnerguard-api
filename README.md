@@ -345,7 +345,9 @@ partnerguard-api/
 ├── redocly.yaml               # Contract lint rules (DOC-03)
 ├── .gitleaksignore            # Fingerprints of known non-secrets (HRD-10)
 ├── LICENSE                    # MIT
-└── .github/workflows/ci.yml   # Build and test, contract lint, secret scan, dependency check
+└── .github/workflows/
+    ├── ci.yml                 # Build and test, contract lint, secret scan, dependency check
+    └── nvd-database.yml       # Nightly refresh of the cached NVD database (ADR-0025)
 ```
 
 The code is organized by feature, not by layer
@@ -453,17 +455,15 @@ On every push to `main` and every pull request, GitHub Actions
 | Secret scan | gitleaks over the whole git history; known non-secrets listed in [`.gitleaksignore`](.gitleaksignore) | HRD-10 |
 | Dependency check | OWASP Dependency-Check (`./mvnw dependency-check:check`), fails on CVSS ≥ 7, report uploaded as an artifact | HRD-11 |
 
-The four jobs run in parallel. The dependency check needs a free
-[NVD API key](https://nvd.nist.gov/developers/request-an-api-key) in the
-repository secret `NVD_API_KEY`; without it the job fails on purpose rather than
-running unchecked. A fork must add its own. The vulnerability database lives in
-the Actions cache: a separate workflow
+The four jobs run in parallel. The dependency check reads the NVD from NIST's
+official JSON 2.0 data feeds, not the NVD API, so it needs no API key
+([ADR-0025](docs/adr/0025-read-nvd-data-from-the-nist-data-feeds.md)). The
+vulnerability database lives in the Actions cache: a separate workflow
 ([`.github/workflows/nvd-database.yml`](.github/workflows/nvd-database.yml),
 nightly and on demand) refreshes it and is its only writer, so the CI job only
-downloads the day's changes. The first full NVD download can take hours, which
-doesn't fit a CI run, so with an empty cache the dependency check fails at once
-and asks for a manual run of that workflow (Actions → *NVD database* → *Run
-workflow*).
+fetches the day's changes. With an empty cache (unused for 7 days, for example)
+the dependency check fails at once rather than running unchecked, and asks for
+a manual run of that workflow (Actions → *NVD database* → *Run workflow*).
 
 The workflow is hardened like the API: the token is read-only
 (`permissions: contents: read`), checkout doesn't persist credentials, and

@@ -232,8 +232,8 @@
 
             <!--
               OWASP Dependency-Check (specs/hardening.md rule 12, HRD-11). Not bound to a phase: CI runs
-              ./mvnw dependency-check:check in its own job. The NVD API key comes from the NVD_API_KEY
-              environment variable (a GitHub secret in CI), never from this file.
+              ./mvnw dependency-check:check in its own job, from the database that
+              .github/workflows/nvd-database.yml keeps in the Actions cache.
             -->
             <plugin>
                 <groupId>org.owasp</groupId>
@@ -241,7 +241,12 @@
                 <version>${dependency-check.version}</version>
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
-                    <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+                    <!--
+                      NIST's static JSON 2.0 feeds instead of the NVD API, whose 503s kept a full download
+                      from finishing (ADR-0025). {0} is a year or "modified"; each .meta file says when its
+                      feed last changed.
+                    -->
+                    <nvdDatafeedUrl>https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz</nvdDatafeedUrl>
                     <!-- Outside ~/.m2, so CI can cache it on its own schedule (refreshed daily). -->
                     <dataDirectory>${user.home}/.dependency-check-data</dataDirectory>
                     <formats>

@@ -101,19 +101,9 @@ jobs:
     name: Dependency check (HRD-11)
     runs-on: ubuntu-24.04
     # Starts from the database cached by nvd-database.yml and only downloads what changed since.
-    timeout-minutes: 45
-    env:
-      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+    timeout-minutes: 30
 
     steps:
-      # Fail closed: without the key the NVD throttles the download until the check is useless.
-      - name: Require the NVD API key
-        run: |
-          if [ -z "$NVD_API_KEY" ]; then
-            echo "::error::The NVD_API_KEY repository secret is missing (specs/hardening.md rule 12)."
-            exit 1
-          fi
-
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -127,7 +117,7 @@ jobs:
           cache: maven
 
       # The workflow nvd-database.yml refreshes this database daily and is the only one that saves
-      # it: a full NVD download can take hours and doesn't fit here, nor survive a newer push.
+      # it, so a newer push can't cancel a full download halfway and leave a partial database behind.
       - name: Compute the database cache key
         id: nvd-cache
         run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
@@ -140,7 +130,7 @@ jobs:
           key: dependency-check-data-${{ steps.nvd-cache.outputs.day }}
           restore-keys: dependency-check-data-
 
-      # Fail closed and fast instead of starting a full download that can't finish in time.
+      # Fail closed and fast: without a cached database there is nothing to check against.
       - name: Require the cached database
         if: steps.nvd-restore.outputs.cache-matched-key == ''
         run: |
